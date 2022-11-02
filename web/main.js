@@ -3,7 +3,7 @@ import View from 'ol/View';
 import './style.css';
 import TileLayer from 'ol/layer/Tile';
 import Zoomify from 'ol/source/Zoomify';
-import {FullScreen } from 'ol/control';
+import {Control, FullScreen } from 'ol/control';
 
 const imgWidth = 6132;
 const imgHeight = 8176;
@@ -11,8 +11,6 @@ const imgHeight = 8176;
 let extent = [0, -imgHeight, imgWidth, 0];
 
 let zoomifyUrlOne = 'assets/tiled_one/';
-let zoomifyUrlTwo = 'assets/tiled_two/';
-let zoomifyUrlThree = 'assets/tiled_three/';
 
 let source = new Zoomify({
   url: zoomifyUrlOne,
@@ -29,6 +27,7 @@ let layer = new TileLayer({
 const map = new Map({
   controls: [
     new FullScreen(),
+    new Control({element: _buildInfoButton()})
   ],
   layers: [layer],
   target: 'map',
@@ -108,4 +107,21 @@ function updateImageMap(url) {
   map.getView().fit(extent);
 }
 
-window.updateImageMap = updateImageMap;
+/* import './style.css';
+import {Map, View} from 'ol';
+import TileLayer from 'ol/layer/Tile';
+import OSM from 'ol/source/OSM';
+
+const map = new Map({
+  target: 'map',
+  layers: [
+    new TileLayer({
+      source: new OSM()
+    })
+  ],
+  view: new View({
+    center: [0, 0],
+    zoom: 2
+  })
+});
+ */

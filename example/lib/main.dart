@@ -28,21 +28,18 @@ class OpenLayersView extends StatefulWidget {
 
 class _OpenLayersViewState extends State<OpenLayersView> {
   OpenLayersController? controller;
+  String text = "";
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Open Layers Demo"),
+        title: const Text("Open Layers asdaf"),
         backgroundColor: Colors.red,
       ),
       body: Container(
         color: Colors.white,
-        child: Stack(
-          children: [
-            const OpenLayersImageViewer(),
-          ],
-        ),
+        child: const OpenLayersImageViewer(),
       ),
     );
   }

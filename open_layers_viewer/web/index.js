@@ -11078,7 +11078,7 @@ const FullScreen$1 = FullScreen;
 const imgWidth = 6132;
 const imgHeight = 8176;
 let extent = [0, -imgHeight, imgWidth, 0];
-let zoomifyUrlOne = "../example/assets/assets/tiled_one/";
+let zoomifyUrlOne = "assets/tiled_one/";
 let source = new Zoomify$1({
   url: zoomifyUrlOne,
   size: [imgWidth, imgHeight],
@@ -11091,7 +11091,8 @@ let layer = new TileLayer$1({
 });
 const map = new Map$1({
   controls: [
-    new FullScreen$1()
+    new FullScreen$1(),
+    new Control$1({ element: _buildInfoButton() })
   ],
   layers: [layer],
   target: "map",
@@ -11102,6 +11103,47 @@ const map = new Map$1({
   })
 });
 map.getView().fit(extent);
+function _buildInfoButton() {
+  let buttonOne = document.createElement("button");
+  buttonOne.innerHTML = "<span>One</span>";
+  buttonOne.id = "layer-one-button";
+  buttonOne.style = "margin: 10px; color: white; padding-top: 2px; padding-bottom: 2px: padding-left: 5px; padding-right: 5px;";
+  let buttonTwo = document.createElement("button");
+  buttonTwo.innerHTML = "<span>Two</span>";
+  buttonTwo.id = "layer-two-button";
+  buttonTwo.style = "margin: 10px;";
+  let buttonThree = document.createElement("button");
+  buttonThree.innerHTML = "<span>Three</span>";
+  buttonThree.id = "layer-three-button";
+  buttonThree.style = "margin: 10px;";
+  let zoomButton = document.createElement("button");
+  zoomButton.innerHTML = "<span>Log Zoom</span>";
+  zoomButton.id = "layer-theee-button";
+  zoomButton.style = "margin: 10px;";
+  let title = document.createElement("div");
+  title.className = "image-title-element";
+  title.id = "image-title-element";
+  let element = document.createElement("div");
+  element.id = "button-container";
+  element.appendChild(buttonOne);
+  element.appendChild(buttonTwo);
+  element.appendChild(buttonThree);
+  element.appendChild(zoomButton);
+  element.appendChild(title);
+  buttonOne.addEventListener("click", () => {
+    updateImageMap(zoomifyUrlOne);
+  }, false);
+  buttonTwo.addEventListener("click", () => {
+    updateImageMap(zoomifyUrlTwo);
+  }, false);
+  buttonThree.addEventListener("click", () => {
+    updateImageMap(zoomifyUrlThree);
+  }, false);
+  zoomButton.addEventListener("click", () => {
+    console.log(map.getView().getZoom());
+  }, false);
+  return element;
+}
 function updateImageMap(url) {
   let source2 = new Zoomify$1({
     url,
@@ -11119,5 +11161,4 @@ function updateImageMap(url) {
   map.getLayers().getArray()[0] = layer2;
   map.getView().fit(extent);
 }
-window.updateImageMap = updateImageMap;
 //# sourceMappingURL=index.js.map

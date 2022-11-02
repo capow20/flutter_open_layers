@@ -1,15 +1,20 @@
-export default {
-  build: {
-    sourcemap: true,
-    outDir: "../open_layers_viewer/web",
-    minify: false,
-    emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        entryFileNames: `[name].js`,
-        chunkFileNames: `[name].js`,
-        assetFileNames: `[name].[ext]`,
+import { defineConfig } from "vite"
+
+export default defineConfig(({command, mode}) => {
+  return {
+    publicDir: 'public',
+    build: {
+      sourcemap: true,
+      outDir: "../open_layers_viewer/web",
+      minify: false,
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          entryFileNames: `[name].js`,
+          chunkFileNames: `[name].js`,
+          assetFileNames: `[name].[ext]`,
+        },
       },
-    },
+    }
   }
-}
+})

@@ -10,8 +10,10 @@ environment:
 dependencies:
 
   # webview
-  webview_flutter: ^3.0.4
-  
+  flutter_inappwebview: ^5.7.1
+
+  local_assets_server: ^2.0.2+10
+
   flutter:
     sdk: flutter
 
@@ -22,3 +24,6 @@ dev_dependencies:
 
 flutter:
 
+  assets:
+    - assets/
+    - web/

@@ -1,7 +1,7 @@
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:open_layers_viewer/open_layers_viewer.dart';
 
 class OpenLayersController {
-  WebViewController? webController;
+  InAppWebViewController? webController;
   bool? debug;
 
   OpenLayersController({
@@ -9,6 +9,10 @@ class OpenLayersController {
   });
 
   Future<void> updateLayer(String url) async {
-    return webController?.runJavascript('window.updateImageMap($url)');
+    return webController?.evaluateJavascript(source: "window.updateImageMap($url)");
+  }
+
+  Future<void> setupOpenLayers(String initialUrl) async {
+    return webController?.evaluateJavascript(source: 'window.setupOpenLayers($initialUrl)');
   }
 }
