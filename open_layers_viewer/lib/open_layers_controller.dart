@@ -9,10 +9,12 @@ class OpenLayersController {
   });
 
   Future<void> updateLayer(String url) async {
-    return webController?.evaluateJavascript(source: "window.updateImageMap($url)");
+    return webController?.evaluateJavascript(source: 'window.updateImageMap("$url")');
   }
 
-  Future<void> setupOpenLayers(String initialUrl) async {
-    return webController?.evaluateJavascript(source: 'window.setupOpenLayers($initialUrl)');
+  Future<void> setupScene(String url) async {
+    return webController?.evaluateJavascript(
+      source: 'window.setupScene("$url")',
+    );
   }
 }

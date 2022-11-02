@@ -7,7 +7,7 @@ export default defineConfig(({command, mode}) => {
       sourcemap: true,
       outDir: "../open_layers_viewer/web",
       minify: false,
-      emptyOutDir: true,
+      emptyOutDir: false,
       rollupOptions: {
         output: {
           entryFileNames: `[name].js`,

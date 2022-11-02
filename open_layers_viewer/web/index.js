@@ -460,11 +460,11 @@ class BaseObject extends Observable$1 {
       this.set(key, values[key], silent);
     }
   }
-  applyProperties(source2) {
-    if (!source2.values_) {
+  applyProperties(source) {
+    if (!source.values_) {
       return;
     }
-    Object.assign(this.values_ || (this.values_ = {}), source2.values_);
+    Object.assign(this.values_ || (this.values_ = {}), source.values_);
   }
   unset(key, silent) {
     if (this.values_ && key in this.values_) {
@@ -732,15 +732,15 @@ function compose(transform2, dx1, dy1, sx, sy, angle, dx2, dy2) {
   transform2[5] = dx2 * sy * sin + dy2 * sy * cos + dy1;
   return transform2;
 }
-function makeInverse(target, source2) {
-  const det = determinant(source2);
+function makeInverse(target, source) {
+  const det = determinant(source);
   assert(det !== 0, 32);
-  const a = source2[0];
-  const b = source2[1];
-  const c = source2[2];
-  const d = source2[3];
-  const e = source2[4];
-  const f = source2[5];
+  const a = source[0];
+  const b = source[1];
+  const c = source[2];
+  const d = source[3];
+  const e = source[4];
+  const f = source[5];
   target[0] = d / det;
   target[1] = -b / det;
   target[2] = -c / det;
@@ -1496,8 +1496,8 @@ class Layer extends BaseLayer$1 {
       LayerProperty.SOURCE,
       this.handleSourcePropertyChange_
     );
-    const source2 = options.source ? options.source : null;
-    this.setSource(source2);
+    const source = options.source ? options.source : null;
+    this.setSource(source);
   }
   getLayersArray(array) {
     array = array ? array : [];
@@ -1516,8 +1516,8 @@ class Layer extends BaseLayer$1 {
     return this.getSource();
   }
   getSourceState() {
-    const source2 = this.getSource();
-    return !source2 ? "undefined" : source2.getState();
+    const source = this.getSource();
+    return !source ? "undefined" : source.getState();
   }
   handleSourceChange_() {
     this.changed();
@@ -1527,10 +1527,10 @@ class Layer extends BaseLayer$1 {
       unlistenByKey(this.sourceChangeKey_);
       this.sourceChangeKey_ = null;
     }
-    const source2 = this.getSource();
-    if (source2) {
+    const source = this.getSource();
+    if (source) {
       this.sourceChangeKey_ = listen(
-        source2,
+        source,
         EventType.CHANGE,
         this.handleSourceChange_,
         this
@@ -1603,8 +1603,8 @@ class Layer extends BaseLayer$1 {
       this.changed();
     }
   }
-  setSource(source2) {
-    this.set(LayerProperty.SOURCE, source2);
+  setSource(source) {
+    this.set(LayerProperty.SOURCE, source);
   }
   getRenderer() {
     if (!this.renderer_) {
@@ -1716,8 +1716,8 @@ class MapRenderer extends Disposable$1 {
   forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, checkWrapped, callback, thisArg, layerFilter, thisArg2) {
     let result;
     const viewState = frameState.viewState;
-    function forEachFeatureAtCoordinate(managed, feature, layer2, geometry) {
-      return callback.call(thisArg, feature, managed ? layer2 : null, geometry);
+    function forEachFeatureAtCoordinate(managed, feature, layer, geometry) {
+      return callback.call(thisArg, feature, managed ? layer : null, geometry);
     }
     const projection = viewState.projection;
     const translatedCoordinate = wrapX$1(coordinate.slice(), projection);
@@ -1734,12 +1734,12 @@ class MapRenderer extends Disposable$1 {
     for (let i = 0; i < offsets.length; i++) {
       for (let j = numLayers - 1; j >= 0; --j) {
         const layerState = layerStates[j];
-        const layer2 = layerState.layer;
-        if (layer2.hasRenderer() && inView(layerState, viewState) && layerFilter.call(thisArg2, layer2)) {
-          const layerRenderer = layer2.getRenderer();
-          const source2 = layer2.getSource();
-          if (layerRenderer && source2) {
-            const coordinates2 = source2.getWrapX() ? translatedCoordinate : coordinate;
+        const layer = layerState.layer;
+        if (layer.hasRenderer() && inView(layerState, viewState) && layerFilter.call(thisArg2, layer)) {
+          const layerRenderer = layer.getRenderer();
+          const source = layer.getSource();
+          if (layerRenderer && source) {
+            const coordinates2 = source.getWrapX() ? translatedCoordinate : coordinate;
             const callback2 = forEachFeatureAtCoordinate.bind(
               null,
               layerState.managed
@@ -1811,7 +1811,6 @@ class RenderEvent extends Event {
 const RenderEvent$1 = RenderEvent;
 const CLASS_HIDDEN = "ol-hidden";
 const CLASS_UNSELECTABLE = "ol-unselectable";
-const CLASS_UNSUPPORTED = "ol-unsupported";
 const CLASS_CONTROL = "ol-control";
 const CLASS_COLLAPSED = "ol-collapsed";
 function createCanvasContext2D(width, height, canvasPool2, settings) {
@@ -1927,13 +1926,13 @@ class CompositeMapRenderer extends MapRenderer$1 {
     for (let i = 0, ii = layerStatesArray.length; i < ii; ++i) {
       const layerState = layerStatesArray[i];
       frameState.layerIndex = i;
-      const layer2 = layerState.layer;
-      const sourceState = layer2.getSourceState();
+      const layer = layerState.layer;
+      const sourceState = layer.getSourceState();
       if (!inView(layerState, viewState) || sourceState != "ready" && sourceState != "undefined") {
-        layer2.unrender();
+        layer.unrender();
         continue;
       }
-      const element = layer2.render(frameState, previousElement);
+      const element = layer.render(frameState, previousElement);
       if (!element) {
         continue;
       }
@@ -1941,9 +1940,9 @@ class CompositeMapRenderer extends MapRenderer$1 {
         this.children_.push(element);
         previousElement = element;
       }
-      if ("getDeclutter" in layer2) {
+      if ("getDeclutter" in layer) {
         declutterLayers.push(
-          layer2
+          layer
         );
       }
     }
@@ -1961,9 +1960,9 @@ class CompositeMapRenderer extends MapRenderer$1 {
 }
 const CompositeMapRenderer$1 = CompositeMapRenderer;
 class GroupEvent extends Event {
-  constructor(type, layer2) {
+  constructor(type, layer) {
     super(type);
-    this.layer = layer2;
+    this.layer = layer;
   }
 }
 const Property = {
@@ -2010,29 +2009,29 @@ class LayerGroup extends BaseLayer$1 {
     clear(this.listenerKeys_);
     const layersArray = layers.getArray();
     for (let i = 0, ii = layersArray.length; i < ii; i++) {
-      const layer2 = layersArray[i];
-      this.registerLayerListeners_(layer2);
-      this.dispatchEvent(new GroupEvent("addlayer", layer2));
+      const layer = layersArray[i];
+      this.registerLayerListeners_(layer);
+      this.dispatchEvent(new GroupEvent("addlayer", layer));
     }
     this.changed();
   }
-  registerLayerListeners_(layer2) {
+  registerLayerListeners_(layer) {
     const listenerKeys = [
       listen(
-        layer2,
+        layer,
         ObjectEventType.PROPERTYCHANGE,
         this.handleLayerChange_,
         this
       ),
-      listen(layer2, EventType.CHANGE, this.handleLayerChange_, this)
+      listen(layer, EventType.CHANGE, this.handleLayerChange_, this)
     ];
-    if (layer2 instanceof LayerGroup) {
+    if (layer instanceof LayerGroup) {
       listenerKeys.push(
-        listen(layer2, "addlayer", this.handleLayerGroupAdd_, this),
-        listen(layer2, "removelayer", this.handleLayerGroupRemove_, this)
+        listen(layer, "addlayer", this.handleLayerGroupAdd_, this),
+        listen(layer, "removelayer", this.handleLayerGroupRemove_, this)
       );
     }
-    this.listenerKeys_[getUid(layer2)] = listenerKeys;
+    this.listenerKeys_[getUid(layer)] = listenerKeys;
   }
   handleLayerGroupAdd_(event) {
     this.dispatchEvent(new GroupEvent("addlayer", event.layer));
@@ -2041,17 +2040,17 @@ class LayerGroup extends BaseLayer$1 {
     this.dispatchEvent(new GroupEvent("removelayer", event.layer));
   }
   handleLayersAdd_(collectionEvent) {
-    const layer2 = collectionEvent.element;
-    this.registerLayerListeners_(layer2);
-    this.dispatchEvent(new GroupEvent("addlayer", layer2));
+    const layer = collectionEvent.element;
+    this.registerLayerListeners_(layer);
+    this.dispatchEvent(new GroupEvent("addlayer", layer));
     this.changed();
   }
   handleLayersRemove_(collectionEvent) {
-    const layer2 = collectionEvent.element;
-    const key = getUid(layer2);
+    const layer = collectionEvent.element;
+    const key = getUid(layer);
     this.listenerKeys_[key].forEach(unlistenByKey);
     delete this.listenerKeys_[key];
-    this.dispatchEvent(new GroupEvent("removelayer", layer2));
+    this.dispatchEvent(new GroupEvent("removelayer", layer));
     this.changed();
   }
   getLayers() {
@@ -2069,16 +2068,16 @@ class LayerGroup extends BaseLayer$1 {
   }
   getLayersArray(array) {
     array = array !== void 0 ? array : [];
-    this.getLayers().forEach(function(layer2) {
-      layer2.getLayersArray(array);
+    this.getLayers().forEach(function(layer) {
+      layer.getLayersArray(array);
     });
     return array;
   }
   getLayerStatesArray(dest) {
     const states = dest !== void 0 ? dest : [];
     const pos = states.length;
-    this.getLayers().forEach(function(layer2) {
-      layer2.getLayerStatesArray(states);
+    this.getLayers().forEach(function(layer) {
+      layer.getLayerStatesArray(states);
     });
     const ownLayerState = this.getLayerState();
     let defaultZIndex = ownLayerState.zIndex;
@@ -2797,8 +2796,8 @@ function add$1(code, projection) {
   cache[code] = projection;
 }
 let transforms = {};
-function add(source2, destination, transformFn) {
-  const sourceCode = source2.getCode();
+function add(source, destination, transformFn) {
+  const sourceCode = source.getCode();
   const destinationCode = destination.getCode();
   if (!(sourceCode in transforms)) {
     transforms[sourceCode] = {};
@@ -2906,10 +2905,10 @@ function getPointResolution(projection, resolution, point, units) {
 }
 function addEquivalentProjections(projections) {
   addProjections(projections);
-  projections.forEach(function(source2) {
+  projections.forEach(function(source) {
     projections.forEach(function(destination) {
-      if (source2 !== destination) {
-        add(source2, destination, cloneTransform);
+      if (source !== destination) {
+        add(source, destination, cloneTransform);
       }
     });
   });
@@ -2952,13 +2951,13 @@ function getTransformFromProjections(sourceProjection, destinationProjection) {
   }
   return transformFunc;
 }
-function getTransform(source2, destination) {
-  const sourceProjection = get(source2);
+function getTransform(source, destination) {
+  const sourceProjection = get(source);
   const destinationProjection = get(destination);
   return getTransformFromProjections(sourceProjection, destinationProjection);
 }
-function transform(coordinate, source2, destination) {
-  const transformFunc = getTransform(source2, destination);
+function transform(coordinate, source, destination) {
+  const transformFunc = getTransform(source, destination);
   return transformFunc(coordinate, void 0, coordinate.length);
 }
 function toUserCoordinate(coordinate, sourceProjection) {
@@ -3352,8 +3351,8 @@ class Geometry extends BaseObject$1 {
   translate(deltaX, deltaY) {
     abstract();
   }
-  transform(source2, destination) {
-    const sourceProj = get(source2);
+  transform(source, destination) {
+    const sourceProj = get(source);
     const transformFn = sourceProj.getUnits() == "tile-pixels" ? function(inCoordinates, outCoordinates, stride) {
       const pixelExtent = sourceProj.getExtent();
       const projectedExtent = sourceProj.getWorldExtent();
@@ -5700,11 +5699,11 @@ class Attribution extends Control$1 {
       if (!inView(layerState, frameState.viewState)) {
         continue;
       }
-      const source2 = layerState.layer.getSource();
-      if (!source2) {
+      const source = layerState.layer.getSource();
+      if (!source) {
         continue;
       }
-      const attributionGetter = source2.getAttributions();
+      const attributionGetter = source.getAttributions();
       if (!attributionGetter) {
         continue;
       }
@@ -5712,7 +5711,7 @@ class Attribution extends Control$1 {
       if (!attributions) {
         continue;
       }
-      collapsible = collapsible && source2.getAttributionsCollapsible() !== false;
+      collapsible = collapsible && source.getAttributionsCollapsible() !== false;
       if (Array.isArray(attributions)) {
         for (let j = 0, jj = attributions.length; j < jj; ++j) {
           if (!(attributions[j] in lookup)) {
@@ -7012,22 +7011,22 @@ function toSize(size, dest) {
     return dest;
   }
 }
-function removeLayerMapProperty(layer2) {
-  if (layer2 instanceof Layer$1) {
-    layer2.setMapInternal(null);
+function removeLayerMapProperty(layer) {
+  if (layer instanceof Layer$1) {
+    layer.setMapInternal(null);
     return;
   }
-  if (layer2 instanceof LayerGroup$1) {
-    layer2.getLayers().forEach(removeLayerMapProperty);
+  if (layer instanceof LayerGroup$1) {
+    layer.getLayers().forEach(removeLayerMapProperty);
   }
 }
-function setLayerMapProperty(layer2, map2) {
-  if (layer2 instanceof Layer$1) {
-    layer2.setMapInternal(map2);
+function setLayerMapProperty(layer, map2) {
+  if (layer instanceof Layer$1) {
+    layer.setMapInternal(map2);
     return;
   }
-  if (layer2 instanceof LayerGroup$1) {
-    const layers = layer2.getLayers().getArray();
+  if (layer instanceof LayerGroup$1) {
+    const layers = layer.getLayers().getArray();
     for (let i = 0, ii = layers.length; i < ii; ++i) {
       setLayerMapProperty(layers[i], map2);
     }
@@ -7167,9 +7166,9 @@ class Map extends BaseObject$1 {
   addInteraction(interaction) {
     this.getInteractions().push(interaction);
   }
-  addLayer(layer2) {
+  addLayer(layer) {
     const layers = this.getLayerGroup().getLayers();
-    layers.push(layer2);
+    layers.push(layer);
   }
   handleLayerAdd_(event) {
     setLayerMapProperty(event.layer, this);
@@ -7225,11 +7224,11 @@ class Map extends BaseObject$1 {
   getAllLayers() {
     const layers = [];
     function addLayersFrom(layerGroup) {
-      layerGroup.forEach(function(layer2) {
-        if (layer2 instanceof LayerGroup$1) {
-          addLayersFrom(layer2.getLayers());
+      layerGroup.forEach(function(layer) {
+        if (layer instanceof LayerGroup$1) {
+          addLayersFrom(layer.getLayers());
         } else {
-          layers.push(layer2);
+          layers.push(layer);
         }
       });
     }
@@ -7337,8 +7336,8 @@ class Map extends BaseObject$1 {
       if (renderer && !renderer.ready) {
         return true;
       }
-      const source2 = state.layer.getSource();
-      if (source2 && source2.loading) {
+      const source = state.layer.getSource();
+      if (source && source.loading) {
         return true;
       }
     }
@@ -7622,9 +7621,9 @@ class Map extends BaseObject$1 {
   redrawText() {
     const layerStates = this.getLayerGroup().getLayerStatesArray();
     for (let i = 0, ii = layerStates.length; i < ii; ++i) {
-      const layer2 = layerStates[i].layer;
-      if (layer2.hasRenderer()) {
-        layer2.getRenderer().handleFontsChanged();
+      const layer = layerStates[i].layer;
+      if (layer.hasRenderer()) {
+        layer.getRenderer().handleFontsChanged();
       }
     }
   }
@@ -7639,9 +7638,9 @@ class Map extends BaseObject$1 {
   removeInteraction(interaction) {
     return this.getInteractions().remove(interaction);
   }
-  removeLayer(layer2) {
+  removeLayer(layer) {
     const layers = this.getLayerGroup().getLayers();
-    return layers.remove(layer2);
+    return layers.remove(layer);
   }
   handleLayerRemove_(event) {
     removeLayerMapProperty(event.layer);
@@ -7893,11 +7892,11 @@ const ImageState = {
   EMPTY: 4
 };
 class LayerRenderer extends Observable$1 {
-  constructor(layer2) {
+  constructor(layer) {
     super();
     this.ready = true;
     this.boundHandleImageChange_ = this.handleImageChange_.bind(this);
-    this.layer_ = layer2;
+    this.layer_ = layer;
     this.declutterExecutorGroup = null;
   }
   getFeatures(pixel) {
@@ -7919,10 +7918,10 @@ class LayerRenderer extends Observable$1 {
     tiles[zoom][tile.tileCoord.toString()] = tile;
     return void 0;
   }
-  createLoadedTileFinder(source2, projection, tiles) {
+  createLoadedTileFinder(source, projection, tiles) {
     return function(zoom, tileRange) {
       const callback = this.loadedTileCallback.bind(this, tiles, zoom);
-      return source2.forEachLoadedTile(projection, zoom, tileRange, callback);
+      return source.forEachLoadedTile(projection, zoom, tileRange, callback);
     }.bind(this);
   }
   forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback, matches) {
@@ -7951,9 +7950,9 @@ class LayerRenderer extends Observable$1 {
     return imageState == ImageState.LOADED;
   }
   renderIfReadyAndVisible() {
-    const layer2 = this.getLayer();
-    if (layer2 && layer2.getVisible() && layer2.getSourceState() === "ready") {
-      layer2.changed();
+    const layer = this.getLayer();
+    if (layer && layer.getVisible() && layer.getSourceState() === "ready") {
+      layer.changed();
     }
   }
   disposeInternal() {
@@ -7970,8 +7969,8 @@ function createPixelContext() {
   pixelContext = canvas.getContext("2d");
 }
 class CanvasLayerRenderer extends LayerRenderer$1 {
-  constructor(layer2) {
-    super(layer2);
+  constructor(layer) {
+    super(layer);
     this.container = null;
     this.renderedResolution;
     this.tempTransform = create();
@@ -7998,8 +7997,8 @@ class CanvasLayerRenderer extends LayerRenderer$1 {
     return data;
   }
   getBackground(frameState) {
-    const layer2 = this.getLayer();
-    let background = layer2.getBackground();
+    const layer = this.getLayer();
+    let background = layer.getBackground();
     if (typeof background === "function") {
       background = background(frameState.viewState.resolution);
     }
@@ -8070,15 +8069,15 @@ class CanvasLayerRenderer extends LayerRenderer$1 {
     context.clip();
   }
   dispatchRenderEvent_(type, context, frameState) {
-    const layer2 = this.getLayer();
-    if (layer2.hasListener(type)) {
+    const layer = this.getLayer();
+    if (layer.hasListener(type)) {
       const event = new RenderEvent$1(
         type,
         this.inversePixelTransform,
         frameState,
         context
       );
-      layer2.dispatchEvent(event);
+      layer.dispatchEvent(event);
     }
   }
   preRender(context, frameState) {
@@ -8699,11 +8698,11 @@ function render(width, height, pixelRatio, sourceResolution, sourceExtent, targe
   });
   const targetTopLeft = getTopLeft(targetExtent);
   triangulation.getTriangles().forEach(function(triangle, i, arr) {
-    const source2 = triangle.source;
+    const source = triangle.source;
     const target = triangle.target;
-    let x0 = source2[0][0], y0 = source2[0][1];
-    let x1 = source2[1][0], y1 = source2[1][1];
-    let x2 = source2[2][0], y2 = source2[2][1];
+    let x0 = source[0][0], y0 = source[0][1];
+    let x1 = source[1][0], y1 = source[1][1];
+    let x2 = source[2][0], y2 = source[2][1];
     const u0 = pixelRound((target[0][0] - targetTopLeft[0]) / targetResolution);
     const v0 = pixelRound(
       -(target[0][1] - targetTopLeft[1]) / targetResolution
@@ -9101,12 +9100,12 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer$1 {
     if (!frameState) {
       return null;
     }
-    const layer2 = this.getLayer();
+    const layer = this.getLayer();
     const coordinate = apply(
       frameState.pixelToCoordinateTransform,
       pixel.slice()
     );
-    const layerExtent = layer2.getExtent();
+    const layerExtent = layer.getExtent();
     if (layerExtent) {
       if (!containsCoordinate(layerExtent, coordinate)) {
         return null;
@@ -9115,12 +9114,12 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer$1 {
     const pixelRatio = frameState.pixelRatio;
     const projection = frameState.viewState.projection;
     const viewState = frameState.viewState;
-    const source2 = layer2.getRenderSource();
-    const tileGrid = source2.getTileGridForProjection(viewState.projection);
-    const tilePixelRatio = source2.getTilePixelRatio(frameState.pixelRatio);
+    const source = layer.getRenderSource();
+    const tileGrid = source.getTileGridForProjection(viewState.projection);
+    const tilePixelRatio = source.getTilePixelRatio(frameState.pixelRatio);
     for (let z = tileGrid.getZForResolution(viewState.resolution); z >= tileGrid.getMinZoom(); --z) {
       const tileCoord = tileGrid.getTileCoordForCoordAndZ(coordinate, z);
-      const tile = source2.getTile(
+      const tile = source.getTile(
         z,
         tileCoord[1],
         tileCoord[2],
@@ -9143,7 +9142,7 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer$1 {
         tilePixelRatio * ((tileOrigin[1] - coordinate[1]) / tileResolution - tileCoord[2] * tileSize[1])
       );
       const gutter = Math.round(
-        tilePixelRatio * source2.getGutterForProjection(viewState.projection)
+        tilePixelRatio * source.getGutterForProjection(viewState.projection)
       );
       return this.getImageData(tile.getImage(), col + gutter, row + gutter);
     }
@@ -10904,261 +10903,51 @@ class Zoomify extends TileImage$1 {
   }
 }
 const Zoomify$1 = Zoomify;
-const events = [
-  "fullscreenchange",
-  "webkitfullscreenchange",
-  "MSFullscreenChange"
-];
-const FullScreenEventType = {
-  ENTERFULLSCREEN: "enterfullscreen",
-  LEAVEFULLSCREEN: "leavefullscreen"
-};
-class FullScreen extends Control$1 {
-  constructor(options) {
-    options = options ? options : {};
-    super({
-      element: document.createElement("div"),
-      target: options.target
-    });
-    this.on;
-    this.once;
-    this.un;
-    this.keys_ = options.keys !== void 0 ? options.keys : false;
-    this.source_ = options.source;
-    this.isInFullscreen_ = false;
-    this.boundHandleMapTargetChange_ = this.handleMapTargetChange_.bind(this);
-    this.cssClassName_ = options.className !== void 0 ? options.className : "ol-full-screen";
-    this.documentListeners_ = [];
-    this.activeClassName_ = options.activeClassName !== void 0 ? options.activeClassName.split(" ") : [this.cssClassName_ + "-true"];
-    this.inactiveClassName_ = options.inactiveClassName !== void 0 ? options.inactiveClassName.split(" ") : [this.cssClassName_ + "-false"];
-    const label = options.label !== void 0 ? options.label : "\u2922";
-    this.labelNode_ = typeof label === "string" ? document.createTextNode(label) : label;
-    const labelActive = options.labelActive !== void 0 ? options.labelActive : "\xD7";
-    this.labelActiveNode_ = typeof labelActive === "string" ? document.createTextNode(labelActive) : labelActive;
-    const tipLabel = options.tipLabel ? options.tipLabel : "Toggle full-screen";
-    this.button_ = document.createElement("button");
-    this.button_.title = tipLabel;
-    this.button_.setAttribute("type", "button");
-    this.button_.appendChild(this.labelNode_);
-    this.button_.addEventListener(
-      EventType.CLICK,
-      this.handleClick_.bind(this),
-      false
-    );
-    this.setClassName_(this.button_, this.isInFullscreen_);
-    this.element.className = `${this.cssClassName_} ${CLASS_UNSELECTABLE} ${CLASS_CONTROL}`;
-    this.element.appendChild(this.button_);
-  }
-  handleClick_(event) {
-    event.preventDefault();
-    this.handleFullScreen_();
-  }
-  handleFullScreen_() {
-    const map2 = this.getMap();
-    if (!map2) {
-      return;
-    }
-    const doc = map2.getOwnerDocument();
-    if (!isFullScreenSupported(doc)) {
-      return;
-    }
-    if (isFullScreen(doc)) {
-      exitFullScreen(doc);
-    } else {
-      let element;
-      if (this.source_) {
-        element = typeof this.source_ === "string" ? doc.getElementById(this.source_) : this.source_;
-      } else {
-        element = map2.getTargetElement();
-      }
-      if (this.keys_) {
-        requestFullScreenWithKeys(element);
-      } else {
-        requestFullScreen(element);
-      }
-    }
-  }
-  handleFullScreenChange_() {
-    const map2 = this.getMap();
-    if (!map2) {
-      return;
-    }
-    const wasInFullscreen = this.isInFullscreen_;
-    this.isInFullscreen_ = isFullScreen(map2.getOwnerDocument());
-    if (wasInFullscreen !== this.isInFullscreen_) {
-      this.setClassName_(this.button_, this.isInFullscreen_);
-      if (this.isInFullscreen_) {
-        replaceNode(this.labelActiveNode_, this.labelNode_);
-        this.dispatchEvent(FullScreenEventType.ENTERFULLSCREEN);
-      } else {
-        replaceNode(this.labelNode_, this.labelActiveNode_);
-        this.dispatchEvent(FullScreenEventType.LEAVEFULLSCREEN);
-      }
-      map2.updateSize();
-    }
-  }
-  setClassName_(element, fullscreen) {
-    if (fullscreen) {
-      element.classList.remove(...this.inactiveClassName_);
-      element.classList.add(...this.activeClassName_);
-    } else {
-      element.classList.remove(...this.activeClassName_);
-      element.classList.add(...this.inactiveClassName_);
-    }
-  }
-  setMap(map2) {
-    const oldMap = this.getMap();
-    if (oldMap) {
-      oldMap.removeChangeListener(
-        MapProperty.TARGET,
-        this.boundHandleMapTargetChange_
-      );
-    }
-    super.setMap(map2);
-    this.handleMapTargetChange_();
-    if (map2) {
-      map2.addChangeListener(
-        MapProperty.TARGET,
-        this.boundHandleMapTargetChange_
-      );
-    }
-  }
-  handleMapTargetChange_() {
-    const listeners = this.documentListeners_;
-    for (let i = 0, ii = listeners.length; i < ii; ++i) {
-      unlistenByKey(listeners[i]);
-    }
-    listeners.length = 0;
-    const map2 = this.getMap();
-    if (map2) {
-      const doc = map2.getOwnerDocument();
-      if (isFullScreenSupported(doc)) {
-        this.element.classList.remove(CLASS_UNSUPPORTED);
-      } else {
-        this.element.classList.add(CLASS_UNSUPPORTED);
-      }
-      for (let i = 0, ii = events.length; i < ii; ++i) {
-        listeners.push(
-          listen(doc, events[i], this.handleFullScreenChange_, this)
-        );
-      }
-      this.handleFullScreenChange_();
-    }
-  }
-}
-function isFullScreenSupported(doc) {
-  const body = doc.body;
-  return !!(body["webkitRequestFullscreen"] || body.requestFullscreen && doc.fullscreenEnabled);
-}
-function isFullScreen(doc) {
-  return !!(doc["webkitIsFullScreen"] || doc.fullscreenElement);
-}
-function requestFullScreen(element) {
-  if (element.requestFullscreen) {
-    element.requestFullscreen();
-  } else if (element["webkitRequestFullscreen"]) {
-    element["webkitRequestFullscreen"]();
-  }
-}
-function requestFullScreenWithKeys(element) {
-  if (element["webkitRequestFullscreen"]) {
-    element["webkitRequestFullscreen"]();
-  } else {
-    requestFullScreen(element);
-  }
-}
-function exitFullScreen(doc) {
-  if (doc.exitFullscreen) {
-    doc.exitFullscreen();
-  } else if (doc["webkitExitFullscreen"]) {
-    doc["webkitExitFullscreen"]();
-  }
-}
-const FullScreen$1 = FullScreen;
+let map;
 const imgWidth = 6132;
 const imgHeight = 8176;
 let extent = [0, -imgHeight, imgWidth, 0];
-let zoomifyUrlOne = "assets/tiled_one/";
-let source = new Zoomify$1({
-  url: zoomifyUrlOne,
-  size: [imgWidth, imgHeight],
-  crossOrigin: "anonymous",
-  zDirection: -1
-});
-let layer = new TileLayer$1({
-  tileSize: 256,
-  source
-});
-const map = new Map$1({
-  controls: [
-    new FullScreen$1(),
-    new Control$1({ element: _buildInfoButton() })
-  ],
-  layers: [layer],
-  target: "map",
-  view: new View$1({
-    resolutions: layer.getSource().getTileGrid().getResolutions(),
-    extent,
-    constrainOnlyCenter: true
-  })
-});
-map.getView().fit(extent);
-function _buildInfoButton() {
-  let buttonOne = document.createElement("button");
-  buttonOne.innerHTML = "<span>One</span>";
-  buttonOne.id = "layer-one-button";
-  buttonOne.style = "margin: 10px; color: white; padding-top: 2px; padding-bottom: 2px: padding-left: 5px; padding-right: 5px;";
-  let buttonTwo = document.createElement("button");
-  buttonTwo.innerHTML = "<span>Two</span>";
-  buttonTwo.id = "layer-two-button";
-  buttonTwo.style = "margin: 10px;";
-  let buttonThree = document.createElement("button");
-  buttonThree.innerHTML = "<span>Three</span>";
-  buttonThree.id = "layer-three-button";
-  buttonThree.style = "margin: 10px;";
-  let zoomButton = document.createElement("button");
-  zoomButton.innerHTML = "<span>Log Zoom</span>";
-  zoomButton.id = "layer-theee-button";
-  zoomButton.style = "margin: 10px;";
-  let title = document.createElement("div");
-  title.className = "image-title-element";
-  title.id = "image-title-element";
-  let element = document.createElement("div");
-  element.id = "button-container";
-  element.appendChild(buttonOne);
-  element.appendChild(buttonTwo);
-  element.appendChild(buttonThree);
-  element.appendChild(zoomButton);
-  element.appendChild(title);
-  buttonOne.addEventListener("click", () => {
-    updateImageMap(zoomifyUrlOne);
-  }, false);
-  buttonTwo.addEventListener("click", () => {
-    updateImageMap(zoomifyUrlTwo);
-  }, false);
-  buttonThree.addEventListener("click", () => {
-    updateImageMap(zoomifyUrlThree);
-  }, false);
-  zoomButton.addEventListener("click", () => {
-    console.log(map.getView().getZoom());
-  }, false);
-  return element;
+function setupScene(url) {
+  let source = new Zoomify$1({
+    url: "https://warm-mesa-43639.herokuapp.com/" + url,
+    size: [imgWidth, imgHeight],
+    crossOrigin: "anonymous",
+    zDirection: -1
+  });
+  let layer = new TileLayer$1({
+    tileSize: 256,
+    source
+  });
+  map = new Map$1({
+    controls: [],
+    layers: [layer],
+    target: "map",
+    view: new View$1({
+      resolutions: layer.getSource().getTileGrid().getResolutions(),
+      extent,
+      constrainOnlyCenter: true
+    })
+  });
+  map.getView().fit(extent);
 }
 function updateImageMap(url) {
-  let source2 = new Zoomify$1({
+  console.log(url);
+  let source = new Zoomify$1({
     url,
     size: [imgWidth, imgHeight]
   });
-  let layer2 = new TileLayer$1({
-    source: source2
+  let layer = new TileLayer$1({
+    source
   });
   let view = new View$1({
-    resolutions: layer2.getSource().getTileGrid().getResolutions(),
+    resolutions: layer.getSource().getTileGrid().getResolutions(),
     extent,
     constrainOnlyCenter: true
   });
   map.setView(view);
-  map.getLayers().getArray()[0] = layer2;
+  map.getLayers().getArray()[0] = layer;
   map.getView().fit(extent);
 }
+window.setupScene = setupScene;
+window.updateImageMap = updateImageMap;
 //# sourceMappingURL=index.js.map
