@@ -29,30 +29,27 @@ class _OpenLayersImageViewerState extends State<OpenLayersImageViewer> {
   @override
   Widget build(BuildContext context) {
     initServer();
-    return Stack(
-      children: [
-        InAppWebView(
-          initialOptions: InAppWebViewGroupOptions(crossPlatform: InAppWebViewOptions(cacheEnabled: false, clearCache: true)),
-          onConsoleMessage: (controller, consoleMessage) => print(consoleMessage),
-          initialUrlRequest: URLRequest(url: Uri.parse('http://localhost:9090/index.html')),
-          onProgressChanged: ((controller, progress) {
-            if (widget.onLoadProgress != null) widget.onLoadProgress!(progress * 1.0, 'Initializing Webview...');
-          }),
-          onWebViewCreated: (c) {
-            c.clearCache();
-            controller = OpenLayersController(webController: c);
-            if (widget.onWebViewCreated != null) widget.onWebViewCreated!(controller);
-            controller.webController?.addJavaScriptHandler(
-                handlerName: 'loadProgress',
-                callback: (args) {
-                  if (widget.onLoadProgress != null) widget.onLoadProgress!(args[0] * 1.0, 'Loading Image...');
-                });
-          },
-          onLoadStop: (c, url) {
-            controller.setupScene(widget.imageUrl);
-          },
-        ),
-      ],
+    return InAppWebView(
+      initialOptions:
+          InAppWebViewGroupOptions(crossPlatform: InAppWebViewOptions(cacheEnabled: false, clearCache: true, transparentBackground: true)),
+      onConsoleMessage: (controller, consoleMessage) => print(consoleMessage),
+      initialUrlRequest: URLRequest(url: Uri.parse('http://localhost:9090/index.html')),
+      onProgressChanged: ((controller, progress) {
+        if (widget.onLoadProgress != null) widget.onLoadProgress!(progress * 1.0, 'Initializing Webview...');
+      }),
+      onWebViewCreated: (c) {
+        controller = OpenLayersController(webController: c);
+        if (widget.onWebViewCreated != null) widget.onWebViewCreated!(controller);
+        controller.webController?.addJavaScriptHandler(
+            handlerName: 'loadProgress',
+            callback: (args) {
+              if (widget.onLoadProgress != null) widget.onLoadProgress!(args[0] * 1.0, 'Loading Image...');
+            });
+      },
+      onLoadStop: (c, url) {
+        c.clearCache();
+        controller.setupScene(widget.imageUrl);
+      },
     );
   }
 }

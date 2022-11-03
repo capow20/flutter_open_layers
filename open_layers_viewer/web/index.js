@@ -10926,10 +10926,8 @@ function setupScene(url) {
     view: new View$1({
       enableRotation: false,
       resolutions: layer.getSource().getTileGrid().getResolutions(),
-      extent,
       constrainOnlyCenter: true,
-      minZoom: 1,
-      zoom: 1
+      minZoom: 1
     })
   });
   map.getView().fit(extent);
@@ -10961,28 +10959,30 @@ function tileLoadProgress(tile, src) {
   xhr.send();
 }
 function updateImageMap(url) {
-  console.log(url);
+  let curCenter = map.getView().getCenter();
+  let curZoom = map.getView().getZoom();
   let source = new Zoomify$1({
     url: "https://warm-mesa-43639.herokuapp.com/" + url,
-    size: [imgWidth, imgHeight]
+    size: [imgWidth, imgHeight],
+    crossOrigin: "anonymous",
+    zDirection: -1
   });
   source.setTileLoadFunction(tileLoadProgress);
   let layer = new TileLayer$1({
+    tileSize: 256,
     source
   });
   let view = new View$1({
     enableRotation: false,
     resolutions: layer.getSource().getTileGrid().getResolutions(),
-    extent,
     constrainOnlyCenter: true,
-    minZoom: 1,
-    zoom: 1
+    minZoom: 1
   });
-  const layers = [...map.getLayers().getArray()];
-  layers.forEach((layer2) => map.removeLayer(layer2));
   map.setView(view);
   map.getLayers().getArray()[0] = layer;
   map.getView().fit(extent);
+  map.getView().setZoom(curZoom);
+  map.getView().setCenter(curCenter);
 }
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;

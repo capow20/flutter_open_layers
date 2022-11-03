@@ -4,12 +4,12 @@ import './style.css';
 import TileLayer from 'ol/layer/Tile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
-import Interaction from 'ol/interaction/Interaction';
 
 let map;
 const imgWidth = 6132;
 const imgHeight = 8176;
 let extent = [0, -imgHeight, imgWidth, 0];
+
 function setupScene(url) {
   let source = new Zoomify({
     url: 'https://warm-mesa-43639.herokuapp.com/' + url,
@@ -32,10 +32,8 @@ function setupScene(url) {
     view: new View({
       enableRotation: false,
       resolutions: layer.getSource().getTileGrid().getResolutions(),
-      extent: extent,
       constrainOnlyCenter: true,
       minZoom: 1,
-      zoom: 1,
     }),
   });
   map.getView().fit(extent);
@@ -69,35 +67,33 @@ function tileLoadProgress(tile, src) {
 }
 
 function updateImageMap(url) {
-  console.log(url);
+  let curCenter = map.getView().getCenter();
+  let curZoom = map.getView().getZoom();
   let source = new Zoomify({
       url: 'https://warm-mesa-43639.herokuapp.com/' + url,
-      size: [imgWidth, imgHeight]
+      size: [imgWidth, imgHeight],
+      crossOrigin: 'anonymous',
+      zDirection: -1,
   });
-
   source.setTileLoadFunction(tileLoadProgress);
 
   let layer = new TileLayer({
-      source: source
+    tileSize: 256,
+    source: source,
   });
   let view = new View({
     enableRotation: false,
     resolutions: layer.getSource().getTileGrid().getResolutions(),
-    extent: extent,
     constrainOnlyCenter: true,
     minZoom: 1,
-    zoom: 1,
   });
-
-  const layers = [...map.getLayers().getArray()];
-  layers.forEach((layer) => map.removeLayer(layer));
 
   map.setView(view);
   map.getLayers().getArray()[0] = layer;
   map.getView().fit(extent);
+  map.getView().setZoom(curZoom);
+  map.getView().setCenter(curCenter);
 }
-
-
 
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;

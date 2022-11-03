@@ -13,6 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Open Layers Demo',
       home: OpenLayersView(),
     );
@@ -28,20 +29,27 @@ class OpenLayersView extends StatefulWidget {
 
 class _OpenLayersViewState extends State<OpenLayersView> {
   OpenLayersController? controller;
-  double? progress = null;
+  double? progress;
   String loadMessage = "";
-
   final imageUrls = [
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_one/",
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_two/",
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_three/",
   ];
+  late String selectedUrl = imageUrls[0];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.blue,
       body: Container(
-        color: Colors.white,
+        decoration: BoxDecoration(
+            gradient: RadialGradient(colors: [
+          Colors.black,
+          Colors.grey.shade400,
+          Colors.blue.shade500,
+          Colors.blue,
+        ], radius: 2)),
         child: Stack(
           children: [
             OpenLayersImageViewer(
@@ -95,19 +103,30 @@ class _OpenLayersViewState extends State<OpenLayersView> {
         child: GestureDetector(
           onTap: () {
             controller?.updateLayer(value);
+            setState(() => selectedUrl = value);
           },
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Colors.blue,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Text(
-                "Layer $layerNum",
-                style: const TextStyle(fontSize: 20, color: Colors.white),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (selectedUrl == value)
+                const Icon(
+                  Icons.star,
+                  color: Colors.deepOrangeAccent,
+                ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.blue,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  child: Text(
+                    "Layer $layerNum",
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
