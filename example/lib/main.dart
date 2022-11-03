@@ -28,6 +28,8 @@ class OpenLayersView extends StatefulWidget {
 
 class _OpenLayersViewState extends State<OpenLayersView> {
   OpenLayersController? controller;
+  double? progress = null;
+  String loadMessage = "";
 
   final imageUrls = [
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_one/",
@@ -43,6 +45,12 @@ class _OpenLayersViewState extends State<OpenLayersView> {
         child: Stack(
           children: [
             OpenLayersImageViewer(
+              onLoadProgress: ((double prog, String message) {
+                setState(() {
+                  progress = prog / 100;
+                  loadMessage = message;
+                });
+              }),
               imageUrl: imageUrls[0],
               onWebViewCreated: (OpenLayersController c) {
                 controller = c;
@@ -55,6 +63,23 @@ class _OpenLayersViewState extends State<OpenLayersView> {
                 children: _buildLayerButtons(),
               ),
             ),
+            if (progress != 1)
+              Align(
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(value: progress, color: Colors.blue),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        loadMessage,
+                        style: const TextStyle(color: Colors.blue, fontSize: 15),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -74,7 +99,7 @@ class _OpenLayersViewState extends State<OpenLayersView> {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: Colors.red,
+              color: Colors.blue,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
