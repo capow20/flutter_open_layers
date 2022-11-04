@@ -1,14 +1,16 @@
 import Map from 'ol/Map';
 import View from 'ol/View';
 import './style.css';
-import TileLayer from 'ol/layer/Tile';
+import TileLayer from 'ol/layer/WebGLTile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
+import Raster from 'ol/source/Raster';
+import {createXYZ} from 'ol/tilegrid';
 
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
-let extent = [0, -imgHeight, imgWidth, 0];
+let extent = [0, -imgHeight, imgWidth,0];
 
 function setupScene(url) {
   let source = new Zoomify({
@@ -20,7 +22,22 @@ function setupScene(url) {
 
   let layer = new TileLayer({
     tileSize: 256,
-    source: source,
+    source: new Raster({
+      sources: [source],
+      operation: function (pixels, data) {
+       /*  const pixel = pixels[0];
+          if (
+            pixel[0] === 0 &&
+            pixel[1] === 0 &&
+            pixel[2] === 0 &&
+            pixel[3] === 255
+          ) {
+            pixel[3] = 0;
+          }
+          return pixel; */
+          return data;
+      }
+    }),
   });
 
   source.setTileLoadFunction(tileLoadProgress);
@@ -30,8 +47,9 @@ function setupScene(url) {
     layers: [layer],
     target: 'map',
     view: new View({
+      extent: extent,
       enableRotation: false,
-      resolutions: layer.getSource().getTileGrid().getResolutions(),
+      resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1,
     }),
@@ -82,6 +100,7 @@ function updateImageMap(url) {
     source: source,
   });
   let view = new View({
+    extent: extent,
     enableRotation: false,
     resolutions: layer.getSource().getTileGrid().getResolutions(),
     constrainOnlyCenter: true,

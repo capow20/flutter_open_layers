@@ -685,7 +685,7 @@ const Collection$1 = Collection;
 const ua = typeof navigator !== "undefined" && typeof navigator.userAgent !== "undefined" ? navigator.userAgent.toLowerCase() : "";
 const FIREFOX = ua.includes("firefox");
 const SAFARI = ua.includes("safari") && !ua.includes("chrom");
-SAFARI && (ua.includes("version/15.4") || /cpu (os|iphone os) 15_4 like mac os x/.test(ua));
+const SAFARI_BUG_237906 = SAFARI && (ua.includes("version/15.4") || /cpu (os|iphone os) 15_4 like mac os x/.test(ua));
 const WEBKIT = ua.includes("webkit") && !ua.includes("edge");
 const MAC = ua.includes("macintosh");
 const DEVICE_PIXEL_RATIO = typeof devicePixelRatio !== "undefined" ? devicePixelRatio : 1;
@@ -710,9 +710,42 @@ function assert(assertion, errorCode) {
     throw new AssertionError$1(errorCode);
   }
 }
-new Array(6);
-function create() {
+const tmp_ = new Array(6);
+function create$1() {
   return [1, 0, 0, 1, 0, 0];
+}
+function reset(transform2) {
+  return set(transform2, 1, 0, 0, 1, 0, 0);
+}
+function multiply(transform1, transform2) {
+  const a1 = transform1[0];
+  const b1 = transform1[1];
+  const c1 = transform1[2];
+  const d1 = transform1[3];
+  const e1 = transform1[4];
+  const f1 = transform1[5];
+  const a2 = transform2[0];
+  const b2 = transform2[1];
+  const c2 = transform2[2];
+  const d2 = transform2[3];
+  const e2 = transform2[4];
+  const f2 = transform2[5];
+  transform1[0] = a1 * a2 + c1 * b2;
+  transform1[1] = b1 * a2 + d1 * b2;
+  transform1[2] = a1 * c2 + c1 * d2;
+  transform1[3] = b1 * c2 + d1 * d2;
+  transform1[4] = a1 * e2 + c1 * f2 + e1;
+  transform1[5] = b1 * e2 + d1 * f2 + f1;
+  return transform1;
+}
+function set(transform2, a, b, c, d, e, f) {
+  transform2[0] = a;
+  transform2[1] = b;
+  transform2[2] = c;
+  transform2[3] = d;
+  transform2[4] = e;
+  transform2[5] = f;
+  return transform2;
 }
 function apply(transform2, coordinate) {
   const x = coordinate[0];
@@ -720,6 +753,17 @@ function apply(transform2, coordinate) {
   coordinate[0] = transform2[0] * x + transform2[2] * y + transform2[4];
   coordinate[1] = transform2[1] * x + transform2[3] * y + transform2[5];
   return coordinate;
+}
+function rotate$2(transform2, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return multiply(transform2, set(tmp_, cos, sin, -sin, cos, 0, 0));
+}
+function scale$3(transform2, x, y) {
+  return multiply(transform2, set(tmp_, x, 0, 0, y, 0, 0));
+}
+function translate$1(transform2, dx, dy) {
+  return multiply(transform2, set(tmp_, 1, 0, 0, 1, dx, dy));
 }
 function compose(transform2, dx1, dy1, sx, sy, angle, dx2, dy2) {
   const sin = Math.sin(angle);
@@ -1291,6 +1335,12 @@ function toString(color) {
   const a = color[3] === void 0 ? 1 : Math.round(color[3] * 100) / 100;
   return "rgba(" + r + "," + g + "," + b + "," + a + ")";
 }
+function isStringColor(s) {
+  if (NAMED_COLOR_RE_.test(s)) {
+    s = fromNamed(s);
+  }
+  return HEX_COLOR_RE_.test(s) || s.startsWith("rgba(") || s.startsWith("rgb(");
+}
 class IconImageCache {
   constructor() {
     this.cache_ = {};
@@ -1801,11 +1851,11 @@ function expireIconCache(map2, frameState) {
 }
 const MapRenderer$1 = MapRenderer;
 class RenderEvent extends Event {
-  constructor(type, inversePixelTransform, frameState, context) {
+  constructor(type, inversePixelTransform, frameState, context2) {
     super(type);
     this.inversePixelTransform = inversePixelTransform;
     this.frameState = frameState;
-    this.context = context;
+    this.context = context2;
   }
 }
 const RenderEvent$1 = RenderEvent;
@@ -1830,11 +1880,11 @@ function createCanvasContext2D(width, height, canvasPool2, settings) {
   }
   return canvas.getContext("2d", settings);
 }
-function releaseCanvas(context) {
-  const canvas = context.canvas;
+function releaseCanvas$1(context2) {
+  const canvas = context2.canvas;
   canvas.width = 1;
   canvas.height = 1;
-  context.clearRect(0, 0, 1, 1);
+  context2.clearRect(0, 0, 1, 1);
 }
 function replaceNode(newNode, oldNode) {
   const parent = oldNode.parentNode;
@@ -3272,7 +3322,7 @@ function translate(flatCoordinates, offset, end, stride, deltaX, deltaY, dest) {
   }
   return dest;
 }
-const tmpTransform = create();
+const tmpTransform = create$1();
 class Geometry extends BaseObject$1 {
   constructor() {
     super();
@@ -7048,8 +7098,8 @@ class Map extends BaseObject$1 {
     this.postRenderTimeoutHandle_;
     this.animationDelayKey_;
     this.animationDelay_ = this.animationDelay_.bind(this);
-    this.coordinateToPixelTransform_ = create();
-    this.pixelToCoordinateTransform_ = create();
+    this.coordinateToPixelTransform_ = create$1();
+    this.pixelToCoordinateTransform_ = create$1();
     this.frameIndex_ = 0;
     this.frameState_ = null;
     this.previousExtent_ = null;
@@ -7884,233 +7934,153 @@ class BaseTileLayer extends Layer$1 {
   }
 }
 const BaseTileLayer$1 = BaseTileLayer;
-const ImageState = {
-  IDLE: 0,
-  LOADING: 1,
-  LOADED: 2,
-  ERROR: 3,
-  EMPTY: 4
-};
-class LayerRenderer extends Observable$1 {
-  constructor(layer) {
-    super();
-    this.ready = true;
-    this.boundHandleImageChange_ = this.handleImageChange_.bind(this);
-    this.layer_ = layer;
-    this.declutterExecutorGroup = null;
+class LRUCache {
+  constructor(highWaterMark) {
+    this.highWaterMark = highWaterMark !== void 0 ? highWaterMark : 2048;
+    this.count_ = 0;
+    this.entries_ = {};
+    this.oldest_ = null;
+    this.newest_ = null;
   }
-  getFeatures(pixel) {
-    return abstract();
+  canExpireCache() {
+    return this.highWaterMark > 0 && this.getCount() > this.highWaterMark;
   }
-  getData(pixel) {
-    return null;
-  }
-  prepareFrame(frameState) {
-    return abstract();
-  }
-  renderFrame(frameState, target) {
-    return abstract();
-  }
-  loadedTileCallback(tiles, zoom, tile) {
-    if (!tiles[zoom]) {
-      tiles[zoom] = {};
-    }
-    tiles[zoom][tile.tileCoord.toString()] = tile;
-    return void 0;
-  }
-  createLoadedTileFinder(source, projection, tiles) {
-    return function(zoom, tileRange) {
-      const callback = this.loadedTileCallback.bind(this, tiles, zoom);
-      return source.forEachLoadedTile(projection, zoom, tileRange, callback);
-    }.bind(this);
-  }
-  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback, matches) {
-    return void 0;
-  }
-  getLayer() {
-    return this.layer_;
-  }
-  handleFontsChanged() {
-  }
-  handleImageChange_(event) {
-    const image = event.target;
-    if (image.getState() === ImageState.LOADED) {
-      this.renderIfReadyAndVisible();
+  expireCache(keep) {
+    while (this.canExpireCache()) {
+      this.pop();
     }
   }
-  loadImage(image) {
-    let imageState = image.getState();
-    if (imageState != ImageState.LOADED && imageState != ImageState.ERROR) {
-      image.addEventListener(EventType.CHANGE, this.boundHandleImageChange_);
-    }
-    if (imageState == ImageState.IDLE) {
-      image.load();
-      imageState = image.getState();
-    }
-    return imageState == ImageState.LOADED;
+  clear() {
+    this.count_ = 0;
+    this.entries_ = {};
+    this.oldest_ = null;
+    this.newest_ = null;
   }
-  renderIfReadyAndVisible() {
-    const layer = this.getLayer();
-    if (layer && layer.getVisible() && layer.getSourceState() === "ready") {
-      layer.changed();
+  containsKey(key) {
+    return this.entries_.hasOwnProperty(key);
+  }
+  forEach(f) {
+    let entry = this.oldest_;
+    while (entry) {
+      f(entry.value_, entry.key_, this);
+      entry = entry.newer;
     }
   }
-  disposeInternal() {
-    delete this.layer_;
-    super.disposeInternal();
-  }
-}
-const LayerRenderer$1 = LayerRenderer;
-let pixelContext = null;
-function createPixelContext() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1;
-  canvas.height = 1;
-  pixelContext = canvas.getContext("2d");
-}
-class CanvasLayerRenderer extends LayerRenderer$1 {
-  constructor(layer) {
-    super(layer);
-    this.container = null;
-    this.renderedResolution;
-    this.tempTransform = create();
-    this.pixelTransform = create();
-    this.inversePixelTransform = create();
-    this.context = null;
-    this.containerReused = false;
-    this.pixelContext_ = null;
-    this.frameState = null;
-  }
-  getImageData(image, col, row) {
-    if (!pixelContext) {
-      createPixelContext();
+  get(key, options) {
+    const entry = this.entries_[key];
+    assert(entry !== void 0, 15);
+    if (entry === this.newest_) {
+      return entry.value_;
+    } else if (entry === this.oldest_) {
+      this.oldest_ = this.oldest_.newer;
+      this.oldest_.older = null;
+    } else {
+      entry.newer.older = entry.older;
+      entry.older.newer = entry.newer;
     }
-    pixelContext.clearRect(0, 0, 1, 1);
-    let data;
-    try {
-      pixelContext.drawImage(image, col, row, 1, 1, 0, 0, 1, 1);
-      data = pixelContext.getImageData(0, 0, 1, 1).data;
-    } catch (err) {
-      pixelContext = null;
-      return null;
-    }
-    return data;
+    entry.newer = null;
+    entry.older = this.newest_;
+    this.newest_.newer = entry;
+    this.newest_ = entry;
+    return entry.value_;
   }
-  getBackground(frameState) {
-    const layer = this.getLayer();
-    let background = layer.getBackground();
-    if (typeof background === "function") {
-      background = background(frameState.viewState.resolution);
-    }
-    return background || void 0;
-  }
-  useContainer(target, transform2, backgroundColor) {
-    const layerClassName = this.getLayer().getClassName();
-    let container, context;
-    if (target && target.className === layerClassName && (!backgroundColor || target && target.style.backgroundColor && equals$2(
-      asArray(target.style.backgroundColor),
-      asArray(backgroundColor)
-    ))) {
-      const canvas = target.firstElementChild;
-      if (canvas instanceof HTMLCanvasElement) {
-        context = canvas.getContext("2d");
+  remove(key) {
+    const entry = this.entries_[key];
+    assert(entry !== void 0, 15);
+    if (entry === this.newest_) {
+      this.newest_ = entry.older;
+      if (this.newest_) {
+        this.newest_.newer = null;
       }
+    } else if (entry === this.oldest_) {
+      this.oldest_ = entry.newer;
+      if (this.oldest_) {
+        this.oldest_.older = null;
+      }
+    } else {
+      entry.newer.older = entry.older;
+      entry.older.newer = entry.newer;
     }
-    if (context && context.canvas.style.transform === transform2) {
-      this.container = target;
-      this.context = context;
-      this.containerReused = true;
-    } else if (this.containerReused) {
-      this.container = null;
-      this.context = null;
-      this.containerReused = false;
+    delete this.entries_[key];
+    --this.count_;
+    return entry.value_;
+  }
+  getCount() {
+    return this.count_;
+  }
+  getKeys() {
+    const keys = new Array(this.count_);
+    let i = 0;
+    let entry;
+    for (entry = this.newest_; entry; entry = entry.older) {
+      keys[i++] = entry.key_;
     }
-    if (!this.container) {
-      container = document.createElement("div");
-      container.className = layerClassName;
-      let style2 = container.style;
-      style2.position = "absolute";
-      style2.width = "100%";
-      style2.height = "100%";
-      context = createCanvasContext2D();
-      const canvas = context.canvas;
-      container.appendChild(canvas);
-      style2 = canvas.style;
-      style2.position = "absolute";
-      style2.left = "0";
-      style2.transformOrigin = "top left";
-      this.container = container;
-      this.context = context;
+    return keys;
+  }
+  getValues() {
+    const values = new Array(this.count_);
+    let i = 0;
+    let entry;
+    for (entry = this.newest_; entry; entry = entry.older) {
+      values[i++] = entry.value_;
     }
-    if (!this.containerReused && backgroundColor && !this.container.style.backgroundColor) {
-      this.container.style.backgroundColor = backgroundColor;
+    return values;
+  }
+  peekLast() {
+    return this.oldest_.value_;
+  }
+  peekLastKey() {
+    return this.oldest_.key_;
+  }
+  peekFirstKey() {
+    return this.newest_.key_;
+  }
+  peek(key) {
+    if (!this.containsKey(key)) {
+      return void 0;
     }
+    return this.entries_[key].value_;
   }
-  clipUnrotated(context, frameState, extent2) {
-    const topLeft = getTopLeft(extent2);
-    const topRight = getTopRight(extent2);
-    const bottomRight = getBottomRight(extent2);
-    const bottomLeft = getBottomLeft(extent2);
-    apply(frameState.coordinateToPixelTransform, topLeft);
-    apply(frameState.coordinateToPixelTransform, topRight);
-    apply(frameState.coordinateToPixelTransform, bottomRight);
-    apply(frameState.coordinateToPixelTransform, bottomLeft);
-    const inverted = this.inversePixelTransform;
-    apply(inverted, topLeft);
-    apply(inverted, topRight);
-    apply(inverted, bottomRight);
-    apply(inverted, bottomLeft);
-    context.save();
-    context.beginPath();
-    context.moveTo(Math.round(topLeft[0]), Math.round(topLeft[1]));
-    context.lineTo(Math.round(topRight[0]), Math.round(topRight[1]));
-    context.lineTo(Math.round(bottomRight[0]), Math.round(bottomRight[1]));
-    context.lineTo(Math.round(bottomLeft[0]), Math.round(bottomLeft[1]));
-    context.clip();
-  }
-  dispatchRenderEvent_(type, context, frameState) {
-    const layer = this.getLayer();
-    if (layer.hasListener(type)) {
-      const event = new RenderEvent$1(
-        type,
-        this.inversePixelTransform,
-        frameState,
-        context
-      );
-      layer.dispatchEvent(event);
+  pop() {
+    const entry = this.oldest_;
+    delete this.entries_[entry.key_];
+    if (entry.newer) {
+      entry.newer.older = null;
     }
+    this.oldest_ = entry.newer;
+    if (!this.oldest_) {
+      this.newest_ = null;
+    }
+    --this.count_;
+    return entry.value_;
   }
-  preRender(context, frameState) {
-    this.frameState = frameState;
-    this.dispatchRenderEvent_(RenderEventType.PRERENDER, context, frameState);
+  replace(key, value) {
+    this.get(key);
+    this.entries_[key].value_ = value;
   }
-  postRender(context, frameState) {
-    this.dispatchRenderEvent_(RenderEventType.POSTRENDER, context, frameState);
+  set(key, value) {
+    assert(!(key in this.entries_), 16);
+    const entry = {
+      key_: key,
+      newer: null,
+      older: this.newest_,
+      value_: value
+    };
+    if (!this.newest_) {
+      this.oldest_ = entry;
+    } else {
+      this.newest_.newer = entry;
+    }
+    this.newest_ = entry;
+    this.entries_[key] = entry;
+    ++this.count_;
   }
-  getRenderTransform(center, resolution, rotation, pixelRatio, width, height, offsetX) {
-    const dx1 = width / 2;
-    const dy1 = height / 2;
-    const sx = pixelRatio / resolution;
-    const sy = -sx;
-    const dx2 = -center[0] + offsetX;
-    const dy2 = -center[1];
-    return compose(
-      this.tempTransform,
-      dx1,
-      dy1,
-      sx,
-      sy,
-      -rotation,
-      dx2,
-      dy2
-    );
-  }
-  disposeInternal() {
-    delete this.frameState;
-    super.disposeInternal();
+  setSize(size) {
+    this.highWaterMark = size;
   }
 }
-const CanvasLayerRenderer$1 = CanvasLayerRenderer;
+const LRUCache$1 = LRUCache;
+const ERROR_THRESHOLD = 0.5;
 class Tile extends EventTarget {
   constructor(tileCoord, state, options) {
     super();
@@ -8214,114 +8184,6 @@ class Tile extends EventTarget {
   }
 }
 const Tile$1 = Tile;
-function listenImage(image, loadHandler, errorHandler) {
-  const img = image;
-  let listening = true;
-  let decoding = false;
-  let loaded = false;
-  const listenerKeys = [
-    listenOnce(img, EventType.LOAD, function() {
-      loaded = true;
-      if (!decoding) {
-        loadHandler();
-      }
-    })
-  ];
-  if (img.src && IMAGE_DECODE) {
-    decoding = true;
-    img.decode().then(function() {
-      if (listening) {
-        loadHandler();
-      }
-    }).catch(function(error) {
-      if (listening) {
-        if (loaded) {
-          loadHandler();
-        } else {
-          errorHandler();
-        }
-      }
-    });
-  } else {
-    listenerKeys.push(listenOnce(img, EventType.ERROR, errorHandler));
-  }
-  return function unlisten() {
-    listening = false;
-    listenerKeys.forEach(unlistenByKey);
-  };
-}
-class ImageTile extends Tile$1 {
-  constructor(tileCoord, state, src, crossOrigin, tileLoadFunction, options) {
-    super(tileCoord, state, options);
-    this.crossOrigin_ = crossOrigin;
-    this.src_ = src;
-    this.key = src;
-    this.image_ = new Image();
-    if (crossOrigin !== null) {
-      this.image_.crossOrigin = crossOrigin;
-    }
-    this.unlisten_ = null;
-    this.tileLoadFunction_ = tileLoadFunction;
-  }
-  getImage() {
-    return this.image_;
-  }
-  setImage(element) {
-    this.image_ = element;
-    this.state = TileState.LOADED;
-    this.unlistenImage_();
-    this.changed();
-  }
-  handleImageError_() {
-    this.state = TileState.ERROR;
-    this.unlistenImage_();
-    this.image_ = getBlankImage();
-    this.changed();
-  }
-  handleImageLoad_() {
-    const image = this.image_;
-    if (image.naturalWidth && image.naturalHeight) {
-      this.state = TileState.LOADED;
-    } else {
-      this.state = TileState.EMPTY;
-    }
-    this.unlistenImage_();
-    this.changed();
-  }
-  load() {
-    if (this.state == TileState.ERROR) {
-      this.state = TileState.IDLE;
-      this.image_ = new Image();
-      if (this.crossOrigin_ !== null) {
-        this.image_.crossOrigin = this.crossOrigin_;
-      }
-    }
-    if (this.state == TileState.IDLE) {
-      this.state = TileState.LOADING;
-      this.changed();
-      this.tileLoadFunction_(this, this.src_);
-      this.unlisten_ = listenImage(
-        this.image_,
-        this.handleImageLoad_.bind(this),
-        this.handleImageError_.bind(this)
-      );
-    }
-  }
-  unlistenImage_() {
-    if (this.unlisten_) {
-      this.unlisten_();
-      this.unlisten_ = null;
-    }
-  }
-}
-function getBlankImage() {
-  const ctx = createCanvasContext2D(1, 1);
-  ctx.fillStyle = "rgba(0,0,0,0)";
-  ctx.fillRect(0, 0, 1, 1);
-  return ctx.canvas;
-}
-const ImageTile$1 = ImageTile;
-const ERROR_THRESHOLD = 0.5;
 const MAX_SUBDIVISION = 10;
 const MAX_TRIANGLE_WIDTH = 0.25;
 class Triangulation {
@@ -8647,22 +8509,22 @@ function calculateSourceExtentResolution(sourceProj, targetProj, targetExtent, t
   return sourceResolution;
 }
 function render(width, height, pixelRatio, sourceResolution, sourceExtent, targetResolution, targetExtent, triangulation, sources, gutter, renderEdges, interpolate) {
-  const context = createCanvasContext2D(
+  const context2 = createCanvasContext2D(
     Math.round(pixelRatio * width),
     Math.round(pixelRatio * height),
     canvasPool
   );
   if (!interpolate) {
-    context.imageSmoothingEnabled = false;
+    context2.imageSmoothingEnabled = false;
   }
   if (sources.length === 0) {
-    return context.canvas;
+    return context2.canvas;
   }
-  context.scale(pixelRatio, pixelRatio);
+  context2.scale(pixelRatio, pixelRatio);
   function pixelRound(value) {
     return Math.round(value * pixelRatio) / pixelRatio;
   }
-  context.globalCompositeOperation = "lighter";
+  context2.globalCompositeOperation = "lighter";
   const sourceDataExtent = createEmpty();
   sources.forEach(function(src, i, arr) {
     extend(sourceDataExtent, src.extent);
@@ -8733,33 +8595,33 @@ function render(width, height, pixelRatio, sourceResolution, sourceExtent, targe
     if (!affineCoefs) {
       return;
     }
-    context.save();
-    context.beginPath();
+    context2.save();
+    context2.beginPath();
     if (isBrokenDiagonalRendering() || !interpolate) {
-      context.moveTo(u1, v1);
+      context2.moveTo(u1, v1);
       const steps = 4;
       const ud = u0 - u1;
       const vd = v0 - v1;
       for (let step = 0; step < steps; step++) {
-        context.lineTo(
+        context2.lineTo(
           u1 + pixelRound((step + 1) * ud / steps),
           v1 + pixelRound(step * vd / (steps - 1))
         );
         if (step != steps - 1) {
-          context.lineTo(
+          context2.lineTo(
             u1 + pixelRound((step + 1) * ud / steps),
             v1 + pixelRound((step + 1) * vd / (steps - 1))
           );
         }
       }
-      context.lineTo(u2, v2);
+      context2.lineTo(u2, v2);
     } else {
-      context.moveTo(u1, v1);
-      context.lineTo(u0, v0);
-      context.lineTo(u2, v2);
+      context2.moveTo(u1, v1);
+      context2.lineTo(u0, v0);
+      context2.lineTo(u2, v2);
     }
-    context.clip();
-    context.transform(
+    context2.clip();
+    context2.transform(
       affineCoefs[0],
       affineCoefs[2],
       affineCoefs[1],
@@ -8767,22 +8629,22 @@ function render(width, height, pixelRatio, sourceResolution, sourceExtent, targe
       u0,
       v0
     );
-    context.translate(
+    context2.translate(
       sourceDataExtent[0] - sourceNumericalShiftX,
       sourceDataExtent[3] - sourceNumericalShiftY
     );
-    context.scale(
+    context2.scale(
       sourceResolution / pixelRatio,
       -sourceResolution / pixelRatio
     );
-    context.drawImage(stitchContext.canvas, 0, 0);
-    context.restore();
+    context2.drawImage(stitchContext.canvas, 0, 0);
+    context2.restore();
   });
   if (renderEdges) {
-    context.save();
-    context.globalCompositeOperation = "source-over";
-    context.strokeStyle = "black";
-    context.lineWidth = 1;
+    context2.save();
+    context2.globalCompositeOperation = "source-over";
+    context2.strokeStyle = "black";
+    context2.lineWidth = 1;
     triangulation.getTriangles().forEach(function(triangle, i, arr) {
       const target = triangle.target;
       const u0 = (target[0][0] - targetTopLeft[0]) / targetResolution;
@@ -8791,16 +8653,16 @@ function render(width, height, pixelRatio, sourceResolution, sourceExtent, targe
       const v1 = -(target[1][1] - targetTopLeft[1]) / targetResolution;
       const u2 = (target[2][0] - targetTopLeft[0]) / targetResolution;
       const v2 = -(target[2][1] - targetTopLeft[1]) / targetResolution;
-      context.beginPath();
-      context.moveTo(u1, v1);
-      context.lineTo(u0, v0);
-      context.lineTo(u2, v2);
-      context.closePath();
-      context.stroke();
+      context2.beginPath();
+      context2.moveTo(u1, v1);
+      context2.lineTo(u0, v0);
+      context2.lineTo(u2, v2);
+      context2.closePath();
+      context2.stroke();
     });
-    context.restore();
+    context2.restore();
   }
-  return context.canvas;
+  return context2.canvas;
 }
 class ReprojTile extends Tile$1 {
   constructor(sourceProj, sourceTileGrid, targetProj, targetTileGrid, tileCoord, wrappedTileCoord, pixelRatio, gutter, getTileFunction, errorThreshold, renderEdges, interpolate) {
@@ -8994,7 +8856,7 @@ class ReprojTile extends Tile$1 {
   }
   release() {
     if (this.canvas_) {
-      releaseCanvas(this.canvas_.getContext("2d"));
+      releaseCanvas$1(this.canvas_.getContext("2d"));
       canvasPool.push(this.canvas_);
       this.canvas_ = null;
     }
@@ -9060,486 +8922,1497 @@ function createOrUpdate$1(minX, maxX, minY, maxY, tileRange) {
   }
 }
 const TileRange$1 = TileRange;
-class CanvasTileLayerRenderer extends CanvasLayerRenderer$1 {
-  constructor(tileLayer) {
-    super(tileLayer);
-    this.extentChanged = true;
-    this.renderedExtent_ = null;
-    this.renderedPixelRatio;
-    this.renderedProjection = null;
-    this.renderedRevision;
-    this.renderedTiles = [];
-    this.newTiles_ = false;
-    this.tmpExtent = createEmpty();
-    this.tmpTileRange_ = new TileRange$1(0, 0, 0, 0);
+class DataTile extends Tile$1 {
+  constructor(options) {
+    const state = TileState.IDLE;
+    super(options.tileCoord, state, {
+      transition: options.transition,
+      interpolate: options.interpolate
+    });
+    this.loader_ = options.loader;
+    this.data_ = null;
+    this.error_ = null;
+    this.size_ = options.size || [256, 256];
   }
-  isDrawableTile(tile) {
-    const tileLayer = this.getLayer();
-    const tileState = tile.getState();
-    const useInterimTilesOnError = tileLayer.getUseInterimTilesOnError();
-    return tileState == TileState.LOADED || tileState == TileState.EMPTY || tileState == TileState.ERROR && !useInterimTilesOnError;
+  getSize() {
+    return this.size_;
   }
-  getTile(z, x, y, frameState) {
-    const pixelRatio = frameState.pixelRatio;
-    const projection = frameState.viewState.projection;
-    const tileLayer = this.getLayer();
-    const tileSource = tileLayer.getSource();
-    let tile = tileSource.getTile(z, x, y, pixelRatio, projection);
-    if (tile.getState() == TileState.ERROR) {
-      if (tileLayer.getUseInterimTilesOnError() && tileLayer.getPreload() > 0) {
-        this.newTiles_ = true;
-      }
-    }
-    if (!this.isDrawableTile(tile)) {
-      tile = tile.getInterimTile();
-    }
-    return tile;
+  getData() {
+    return this.data_;
   }
-  getData(pixel) {
-    const frameState = this.frameState;
-    if (!frameState) {
-      return null;
-    }
-    const layer = this.getLayer();
-    const coordinate = apply(
-      frameState.pixelToCoordinateTransform,
-      pixel.slice()
-    );
-    const layerExtent = layer.getExtent();
-    if (layerExtent) {
-      if (!containsCoordinate(layerExtent, coordinate)) {
-        return null;
-      }
-    }
-    const pixelRatio = frameState.pixelRatio;
-    const projection = frameState.viewState.projection;
-    const viewState = frameState.viewState;
-    const source = layer.getRenderSource();
-    const tileGrid = source.getTileGridForProjection(viewState.projection);
-    const tilePixelRatio = source.getTilePixelRatio(frameState.pixelRatio);
-    for (let z = tileGrid.getZForResolution(viewState.resolution); z >= tileGrid.getMinZoom(); --z) {
-      const tileCoord = tileGrid.getTileCoordForCoordAndZ(coordinate, z);
-      const tile = source.getTile(
-        z,
-        tileCoord[1],
-        tileCoord[2],
-        pixelRatio,
-        projection
-      );
-      if (!(tile instanceof ImageTile$1 || tile instanceof ReprojTile$1) || tile instanceof ReprojTile$1 && tile.getState() === TileState.EMPTY) {
-        return null;
-      }
-      if (tile.getState() !== TileState.LOADED) {
-        continue;
-      }
-      const tileOrigin = tileGrid.getOrigin(z);
-      const tileSize = toSize(tileGrid.getTileSize(z));
-      const tileResolution = tileGrid.getResolution(z);
-      const col = Math.floor(
-        tilePixelRatio * ((coordinate[0] - tileOrigin[0]) / tileResolution - tileCoord[1] * tileSize[0])
-      );
-      const row = Math.floor(
-        tilePixelRatio * ((tileOrigin[1] - coordinate[1]) / tileResolution - tileCoord[2] * tileSize[1])
-      );
-      const gutter = Math.round(
-        tilePixelRatio * source.getGutterForProjection(viewState.projection)
-      );
-      return this.getImageData(tile.getImage(), col + gutter, row + gutter);
-    }
-    return null;
+  getError() {
+    return this.error_;
   }
-  loadedTileCallback(tiles, zoom, tile) {
-    if (this.isDrawableTile(tile)) {
-      return super.loadedTileCallback(tiles, zoom, tile);
-    }
-    return false;
-  }
-  prepareFrame(frameState) {
-    return !!this.getLayer().getSource();
-  }
-  renderFrame(frameState, target) {
-    const layerState = frameState.layerStatesArray[frameState.layerIndex];
-    const viewState = frameState.viewState;
-    const projection = viewState.projection;
-    const viewResolution = viewState.resolution;
-    const viewCenter = viewState.center;
-    const rotation = viewState.rotation;
-    const pixelRatio = frameState.pixelRatio;
-    const tileLayer = this.getLayer();
-    const tileSource = tileLayer.getSource();
-    const sourceRevision = tileSource.getRevision();
-    const tileGrid = tileSource.getTileGridForProjection(projection);
-    const z = tileGrid.getZForResolution(viewResolution, tileSource.zDirection);
-    const tileResolution = tileGrid.getResolution(z);
-    let extent2 = frameState.extent;
-    const resolution = frameState.viewState.resolution;
-    const tilePixelRatio = tileSource.getTilePixelRatio(pixelRatio);
-    const width = Math.round(getWidth(extent2) / resolution * pixelRatio);
-    const height = Math.round(getHeight(extent2) / resolution * pixelRatio);
-    const layerExtent = layerState.extent && fromUserExtent(layerState.extent);
-    if (layerExtent) {
-      extent2 = getIntersection(
-        extent2,
-        fromUserExtent(layerState.extent)
-      );
-    }
-    const dx = tileResolution * width / 2 / tilePixelRatio;
-    const dy = tileResolution * height / 2 / tilePixelRatio;
-    const canvasExtent = [
-      viewCenter[0] - dx,
-      viewCenter[1] - dy,
-      viewCenter[0] + dx,
-      viewCenter[1] + dy
-    ];
-    const tileRange = tileGrid.getTileRangeForExtentAndZ(extent2, z);
-    const tilesToDrawByZ = {};
-    tilesToDrawByZ[z] = {};
-    const findLoadedTiles = this.createLoadedTileFinder(
-      tileSource,
-      projection,
-      tilesToDrawByZ
-    );
-    const tmpExtent = this.tmpExtent;
-    const tmpTileRange = this.tmpTileRange_;
-    this.newTiles_ = false;
-    const viewport = rotation ? getRotatedViewport(
-      viewState.center,
-      resolution,
-      rotation,
-      frameState.size
-    ) : void 0;
-    for (let x = tileRange.minX; x <= tileRange.maxX; ++x) {
-      for (let y = tileRange.minY; y <= tileRange.maxY; ++y) {
-        if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
-          continue;
-        }
-        const tile = this.getTile(z, x, y, frameState);
-        if (this.isDrawableTile(tile)) {
-          const uid = getUid(this);
-          if (tile.getState() == TileState.LOADED) {
-            tilesToDrawByZ[z][tile.tileCoord.toString()] = tile;
-            let inTransition = tile.inTransition(uid);
-            if (inTransition && layerState.opacity !== 1) {
-              tile.endTransition(uid);
-              inTransition = false;
-            }
-            if (!this.newTiles_ && (inTransition || !this.renderedTiles.includes(tile))) {
-              this.newTiles_ = true;
-            }
-          }
-          if (tile.getAlpha(uid, frameState.time) === 1) {
-            continue;
-          }
-        }
-        const childTileRange = tileGrid.getTileCoordChildTileRange(
-          tile.tileCoord,
-          tmpTileRange,
-          tmpExtent
-        );
-        let covered = false;
-        if (childTileRange) {
-          covered = findLoadedTiles(z + 1, childTileRange);
-        }
-        if (!covered) {
-          tileGrid.forEachTileCoordParentTileRange(
-            tile.tileCoord,
-            findLoadedTiles,
-            tmpTileRange,
-            tmpExtent
-          );
-        }
-      }
-    }
-    const canvasScale = tileResolution / viewResolution * pixelRatio / tilePixelRatio;
-    compose(
-      this.pixelTransform,
-      frameState.size[0] / 2,
-      frameState.size[1] / 2,
-      1 / pixelRatio,
-      1 / pixelRatio,
-      rotation,
-      -width / 2,
-      -height / 2
-    );
-    const canvasTransform = toString$1(this.pixelTransform);
-    this.useContainer(target, canvasTransform, this.getBackground(frameState));
-    const context = this.context;
-    const canvas = context.canvas;
-    makeInverse(this.inversePixelTransform, this.pixelTransform);
-    compose(
-      this.tempTransform,
-      width / 2,
-      height / 2,
-      canvasScale,
-      canvasScale,
-      0,
-      -width / 2,
-      -height / 2
-    );
-    if (canvas.width != width || canvas.height != height) {
-      canvas.width = width;
-      canvas.height = height;
-    } else if (!this.containerReused) {
-      context.clearRect(0, 0, width, height);
-    }
-    if (layerExtent) {
-      this.clipUnrotated(context, frameState, layerExtent);
-    }
-    if (!tileSource.getInterpolate()) {
-      context.imageSmoothingEnabled = false;
-    }
-    this.preRender(context, frameState);
-    this.renderedTiles.length = 0;
-    let zs = Object.keys(tilesToDrawByZ).map(Number);
-    zs.sort(numberSafeCompareFunction);
-    let clips, clipZs, currentClip;
-    if (layerState.opacity === 1 && (!this.containerReused || tileSource.getOpaque(frameState.viewState.projection))) {
-      zs = zs.reverse();
-    } else {
-      clips = [];
-      clipZs = [];
-    }
-    for (let i = zs.length - 1; i >= 0; --i) {
-      const currentZ = zs[i];
-      const currentTilePixelSize = tileSource.getTilePixelSize(
-        currentZ,
-        pixelRatio,
-        projection
-      );
-      const currentResolution = tileGrid.getResolution(currentZ);
-      const currentScale = currentResolution / tileResolution;
-      const dx2 = currentTilePixelSize[0] * currentScale * canvasScale;
-      const dy2 = currentTilePixelSize[1] * currentScale * canvasScale;
-      const originTileCoord = tileGrid.getTileCoordForCoordAndZ(
-        getTopLeft(canvasExtent),
-        currentZ
-      );
-      const originTileExtent = tileGrid.getTileCoordExtent(originTileCoord);
-      const origin = apply(this.tempTransform, [
-        tilePixelRatio * (originTileExtent[0] - canvasExtent[0]) / tileResolution,
-        tilePixelRatio * (canvasExtent[3] - originTileExtent[3]) / tileResolution
-      ]);
-      const tileGutter = tilePixelRatio * tileSource.getGutterForProjection(projection);
-      const tilesToDraw = tilesToDrawByZ[currentZ];
-      for (const tileCoordKey in tilesToDraw) {
-        const tile = tilesToDraw[tileCoordKey];
-        const tileCoord = tile.tileCoord;
-        const xIndex = originTileCoord[1] - tileCoord[1];
-        const nextX = Math.round(origin[0] - (xIndex - 1) * dx2);
-        const yIndex = originTileCoord[2] - tileCoord[2];
-        const nextY = Math.round(origin[1] - (yIndex - 1) * dy2);
-        const x = Math.round(origin[0] - xIndex * dx2);
-        const y = Math.round(origin[1] - yIndex * dy2);
-        const w = nextX - x;
-        const h = nextY - y;
-        const transition = z === currentZ;
-        const inTransition = transition && tile.getAlpha(getUid(this), frameState.time) !== 1;
-        let contextSaved = false;
-        if (!inTransition) {
-          if (clips) {
-            currentClip = [x, y, x + w, y, x + w, y + h, x, y + h];
-            for (let i2 = 0, ii = clips.length; i2 < ii; ++i2) {
-              if (z !== currentZ && currentZ < clipZs[i2]) {
-                const clip = clips[i2];
-                if (intersects(
-                  [x, y, x + w, y + h],
-                  [clip[0], clip[3], clip[4], clip[7]]
-                )) {
-                  if (!contextSaved) {
-                    context.save();
-                    contextSaved = true;
-                  }
-                  context.beginPath();
-                  context.moveTo(currentClip[0], currentClip[1]);
-                  context.lineTo(currentClip[2], currentClip[3]);
-                  context.lineTo(currentClip[4], currentClip[5]);
-                  context.lineTo(currentClip[6], currentClip[7]);
-                  context.moveTo(clip[6], clip[7]);
-                  context.lineTo(clip[4], clip[5]);
-                  context.lineTo(clip[2], clip[3]);
-                  context.lineTo(clip[0], clip[1]);
-                  context.clip();
-                }
-              }
-            }
-            clips.push(currentClip);
-            clipZs.push(currentZ);
-          } else {
-            context.clearRect(x, y, w, h);
-          }
-        }
-        this.drawTileImage(
-          tile,
-          frameState,
-          x,
-          y,
-          w,
-          h,
-          tileGutter,
-          transition
-        );
-        if (clips && !inTransition) {
-          if (contextSaved) {
-            context.restore();
-          }
-          this.renderedTiles.unshift(tile);
-        } else {
-          this.renderedTiles.push(tile);
-        }
-        this.updateUsedTiles(frameState.usedTiles, tileSource, tile);
-      }
-    }
-    this.renderedRevision = sourceRevision;
-    this.renderedResolution = tileResolution;
-    this.extentChanged = !this.renderedExtent_ || !equals$1(this.renderedExtent_, canvasExtent);
-    this.renderedExtent_ = canvasExtent;
-    this.renderedPixelRatio = pixelRatio;
-    this.renderedProjection = projection;
-    this.manageTilePyramid(
-      frameState,
-      tileSource,
-      tileGrid,
-      pixelRatio,
-      projection,
-      extent2,
-      z,
-      tileLayer.getPreload()
-    );
-    this.scheduleExpireCache(frameState, tileSource);
-    this.postRender(context, frameState);
-    if (layerState.extent) {
-      context.restore();
-    }
-    context.imageSmoothingEnabled = true;
-    if (canvasTransform !== canvas.style.transform) {
-      canvas.style.transform = canvasTransform;
-    }
-    return this.container;
-  }
-  drawTileImage(tile, frameState, x, y, w, h, gutter, transition) {
-    const image = this.getTileImage(tile);
-    if (!image) {
+  load() {
+    if (this.state !== TileState.IDLE && this.state !== TileState.ERROR) {
       return;
     }
-    const uid = getUid(this);
-    const layerState = frameState.layerStatesArray[frameState.layerIndex];
-    const alpha = layerState.opacity * (transition ? tile.getAlpha(uid, frameState.time) : 1);
-    const alphaChanged = alpha !== this.context.globalAlpha;
-    if (alphaChanged) {
-      this.context.save();
-      this.context.globalAlpha = alpha;
-    }
-    this.context.drawImage(
-      image,
-      gutter,
-      gutter,
-      image.width - 2 * gutter,
-      image.height - 2 * gutter,
-      x,
-      y,
-      w,
-      h
-    );
-    if (alphaChanged) {
-      this.context.restore();
-    }
-    if (alpha !== layerState.opacity) {
-      frameState.animate = true;
-    } else if (transition) {
-      tile.endTransition(uid);
-    }
+    this.state = TileState.LOADING;
+    this.changed();
+    const self2 = this;
+    this.loader_().then(function(data) {
+      self2.data_ = data;
+      self2.state = TileState.LOADED;
+      self2.changed();
+    }).catch(function(error) {
+      self2.error_ = error;
+      self2.state = TileState.ERROR;
+      self2.changed();
+    });
+  }
+}
+const DataTile$1 = DataTile;
+class ImageBase extends EventTarget {
+  constructor(extent2, resolution, pixelRatio, state) {
+    super();
+    this.extent = extent2;
+    this.pixelRatio_ = pixelRatio;
+    this.resolution = resolution;
+    this.state = state;
+  }
+  changed() {
+    this.dispatchEvent(EventType.CHANGE);
+  }
+  getExtent() {
+    return this.extent;
   }
   getImage() {
-    const context = this.context;
-    return context ? context.canvas : null;
+    return abstract();
   }
-  getTileImage(tile) {
-    return tile.getImage();
+  getPixelRatio() {
+    return this.pixelRatio_;
   }
-  scheduleExpireCache(frameState, tileSource) {
-    if (tileSource.canExpireCache()) {
-      const postRenderFunction = function(tileSource2, map2, frameState2) {
-        const tileSourceKey = getUid(tileSource2);
-        if (tileSourceKey in frameState2.usedTiles) {
-          tileSource2.expireCache(
-            frameState2.viewState.projection,
-            frameState2.usedTiles[tileSourceKey]
-          );
+  getResolution() {
+    return this.resolution;
+  }
+  getState() {
+    return this.state;
+  }
+  load() {
+    abstract();
+  }
+}
+const ImageBase$1 = ImageBase;
+const ImageState = {
+  IDLE: 0,
+  LOADING: 1,
+  LOADED: 2,
+  ERROR: 3,
+  EMPTY: 4
+};
+function listenImage(image, loadHandler, errorHandler) {
+  const img = image;
+  let listening = true;
+  let decoding = false;
+  let loaded = false;
+  const listenerKeys = [
+    listenOnce(img, EventType.LOAD, function() {
+      loaded = true;
+      if (!decoding) {
+        loadHandler();
+      }
+    })
+  ];
+  if (img.src && IMAGE_DECODE) {
+    decoding = true;
+    img.decode().then(function() {
+      if (listening) {
+        loadHandler();
+      }
+    }).catch(function(error) {
+      if (listening) {
+        if (loaded) {
+          loadHandler();
+        } else {
+          errorHandler();
         }
-      }.bind(null, tileSource);
-      frameState.postRenderFunctions.push(
-        postRenderFunction
+      }
+    });
+  } else {
+    listenerKeys.push(listenOnce(img, EventType.ERROR, errorHandler));
+  }
+  return function unlisten() {
+    listening = false;
+    listenerKeys.forEach(unlistenByKey);
+  };
+}
+class ImageTile extends Tile$1 {
+  constructor(tileCoord, state, src, crossOrigin, tileLoadFunction, options) {
+    super(tileCoord, state, options);
+    this.crossOrigin_ = crossOrigin;
+    this.src_ = src;
+    this.key = src;
+    this.image_ = new Image();
+    if (crossOrigin !== null) {
+      this.image_.crossOrigin = crossOrigin;
+    }
+    this.unlisten_ = null;
+    this.tileLoadFunction_ = tileLoadFunction;
+  }
+  getImage() {
+    return this.image_;
+  }
+  setImage(element) {
+    this.image_ = element;
+    this.state = TileState.LOADED;
+    this.unlistenImage_();
+    this.changed();
+  }
+  handleImageError_() {
+    this.state = TileState.ERROR;
+    this.unlistenImage_();
+    this.image_ = getBlankImage();
+    this.changed();
+  }
+  handleImageLoad_() {
+    const image = this.image_;
+    if (image.naturalWidth && image.naturalHeight) {
+      this.state = TileState.LOADED;
+    } else {
+      this.state = TileState.EMPTY;
+    }
+    this.unlistenImage_();
+    this.changed();
+  }
+  load() {
+    if (this.state == TileState.ERROR) {
+      this.state = TileState.IDLE;
+      this.image_ = new Image();
+      if (this.crossOrigin_ !== null) {
+        this.image_.crossOrigin = this.crossOrigin_;
+      }
+    }
+    if (this.state == TileState.IDLE) {
+      this.state = TileState.LOADING;
+      this.changed();
+      this.tileLoadFunction_(this, this.src_);
+      this.unlisten_ = listenImage(
+        this.image_,
+        this.handleImageLoad_.bind(this),
+        this.handleImageError_.bind(this)
       );
     }
   }
-  updateUsedTiles(usedTiles, tileSource, tile) {
-    const tileSourceKey = getUid(tileSource);
-    if (!(tileSourceKey in usedTiles)) {
-      usedTiles[tileSourceKey] = {};
+  unlistenImage_() {
+    if (this.unlisten_) {
+      this.unlisten_();
+      this.unlisten_ = null;
     }
-    usedTiles[tileSourceKey][tile.getKey()] = true;
   }
-  manageTilePyramid(frameState, tileSource, tileGrid, pixelRatio, projection, extent2, currentZ, preload, tileCallback) {
-    const tileSourceKey = getUid(tileSource);
-    if (!(tileSourceKey in frameState.wantedTiles)) {
-      frameState.wantedTiles[tileSourceKey] = {};
+}
+function getBlankImage() {
+  const ctx = createCanvasContext2D(1, 1);
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.fillRect(0, 0, 1, 1);
+  return ctx.canvas;
+}
+const ImageTile$1 = ImageTile;
+const ARRAY_BUFFER = 34962;
+const ELEMENT_ARRAY_BUFFER = 34963;
+const STREAM_DRAW = 35040;
+const STATIC_DRAW = 35044;
+const DYNAMIC_DRAW = 35048;
+const UNSIGNED_BYTE = 5121;
+const UNSIGNED_SHORT = 5123;
+const UNSIGNED_INT = 5125;
+const FLOAT = 5126;
+const CONTEXT_IDS = ["experimental-webgl", "webgl", "webkit-3d", "moz-webgl"];
+function getContext(canvas, attributes) {
+  attributes = Object.assign(
+    {
+      preserveDrawingBuffer: true,
+      antialias: SAFARI_BUG_237906 ? false : true
+    },
+    attributes
+  );
+  const ii = CONTEXT_IDS.length;
+  for (let i = 0; i < ii; ++i) {
+    try {
+      const context2 = canvas.getContext(CONTEXT_IDS[i], attributes);
+      if (context2) {
+        return context2;
+      }
+    } catch (e) {
     }
-    const wantedTiles = frameState.wantedTiles[tileSourceKey];
-    const tileQueue = frameState.tileQueue;
-    const minZoom = tileGrid.getMinZoom();
-    const rotation = frameState.viewState.rotation;
-    const viewport = rotation ? getRotatedViewport(
-      frameState.viewState.center,
-      frameState.viewState.resolution,
-      rotation,
-      frameState.size
-    ) : void 0;
-    let tileCount = 0;
-    let tile, tileRange, tileResolution, x, y, z;
-    for (z = minZoom; z <= currentZ; ++z) {
-      tileRange = tileGrid.getTileRangeForExtentAndZ(extent2, z, tileRange);
-      tileResolution = tileGrid.getResolution(z);
-      for (x = tileRange.minX; x <= tileRange.maxX; ++x) {
-        for (y = tileRange.minY; y <= tileRange.maxY; ++y) {
-          if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
-            continue;
-          }
-          if (currentZ - z <= preload) {
-            ++tileCount;
-            tile = tileSource.getTile(z, x, y, pixelRatio, projection);
-            if (tile.getState() == TileState.IDLE) {
-              wantedTiles[tile.getKey()] = true;
-              if (!tileQueue.isKeyQueued(tile.getKey())) {
-                tileQueue.enqueue([
-                  tile,
-                  tileSourceKey,
-                  tileGrid.getTileCoordCenter(tile.tileCoord),
-                  tileResolution
-                ]);
-              }
-            }
-            if (tileCallback !== void 0) {
-              tileCallback(tile);
-            }
-          } else {
-            tileSource.useTile(z, x, y, projection);
+  }
+  return null;
+}
+const BufferUsage = {
+  STATIC_DRAW,
+  STREAM_DRAW,
+  DYNAMIC_DRAW
+};
+class WebGLArrayBuffer {
+  constructor(type, usage) {
+    this.array = null;
+    this.type = type;
+    assert(type === ARRAY_BUFFER || type === ELEMENT_ARRAY_BUFFER, 62);
+    this.usage = usage !== void 0 ? usage : BufferUsage.STATIC_DRAW;
+  }
+  ofSize(size) {
+    this.array = new (getArrayClassForType(this.type))(size);
+  }
+  fromArray(array) {
+    this.array = getArrayClassForType(this.type).from(array);
+  }
+  fromArrayBuffer(buffer) {
+    this.array = new (getArrayClassForType(this.type))(buffer);
+  }
+  getType() {
+    return this.type;
+  }
+  getArray() {
+    return this.array;
+  }
+  getUsage() {
+    return this.usage;
+  }
+  getSize() {
+    return this.array ? this.array.length : 0;
+  }
+}
+function getArrayClassForType(type) {
+  switch (type) {
+    case ARRAY_BUFFER:
+      return Float32Array;
+    case ELEMENT_ARRAY_BUFFER:
+      return Uint32Array;
+    default:
+      return Float32Array;
+  }
+}
+const WebGLArrayBuffer$1 = WebGLArrayBuffer;
+function bindAndConfigure(gl, texture, interpolate) {
+  const resampleFilter = interpolate ? gl.LINEAR : gl.NEAREST;
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, resampleFilter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, resampleFilter);
+}
+function uploadImageTexture(gl, texture, image, interpolate) {
+  bindAndConfigure(gl, texture, interpolate);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+}
+function uploadDataTexture(helper, texture, data, size, bandCount, interpolate) {
+  const gl = helper.getGL();
+  let textureType;
+  let canInterpolate;
+  if (data instanceof Float32Array) {
+    textureType = gl.FLOAT;
+    helper.getExtension("OES_texture_float");
+    const extension = helper.getExtension("OES_texture_float_linear");
+    canInterpolate = extension !== null;
+  } else {
+    textureType = gl.UNSIGNED_BYTE;
+    canInterpolate = true;
+  }
+  bindAndConfigure(gl, texture, interpolate && canInterpolate);
+  const bytesPerRow = data.byteLength / size[1];
+  let unpackAlignment = 1;
+  if (bytesPerRow % 8 === 0) {
+    unpackAlignment = 8;
+  } else if (bytesPerRow % 4 === 0) {
+    unpackAlignment = 4;
+  } else if (bytesPerRow % 2 === 0) {
+    unpackAlignment = 2;
+  }
+  let format;
+  switch (bandCount) {
+    case 1: {
+      format = gl.LUMINANCE;
+      break;
+    }
+    case 2: {
+      format = gl.LUMINANCE_ALPHA;
+      break;
+    }
+    case 3: {
+      format = gl.RGB;
+      break;
+    }
+    case 4: {
+      format = gl.RGBA;
+      break;
+    }
+    default: {
+      throw new Error(`Unsupported number of bands: ${bandCount}`);
+    }
+  }
+  const oldUnpackAlignment = gl.getParameter(gl.UNPACK_ALIGNMENT);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, unpackAlignment);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    format,
+    size[0],
+    size[1],
+    0,
+    format,
+    textureType,
+    data
+  );
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, oldUnpackAlignment);
+}
+let pixelContext$1 = null;
+function createPixelContext$1() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  pixelContext$1 = canvas.getContext("2d");
+}
+class TileTexture extends EventTarget {
+  constructor(options) {
+    super();
+    this.tile;
+    this.textures = [];
+    this.handleTileChange_ = this.handleTileChange_.bind(this);
+    this.renderSize_ = toSize(
+      options.grid.getTileSize(options.tile.tileCoord[0])
+    );
+    this.gutter_ = options.gutter || 0;
+    this.bandCount = NaN;
+    this.helper_ = options.helper;
+    const coords = new WebGLArrayBuffer$1(ARRAY_BUFFER, STATIC_DRAW);
+    coords.fromArray([
+      0,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0
+    ]);
+    this.helper_.flushBufferData(coords);
+    this.coords = coords;
+    this.setTile(options.tile);
+  }
+  setTile(tile) {
+    if (tile !== this.tile) {
+      if (this.tile) {
+        this.tile.removeEventListener(EventType.CHANGE, this.handleTileChange_);
+      }
+      this.tile = tile;
+      this.textures.length = 0;
+      this.loaded = tile.getState() === TileState.LOADED;
+      if (this.loaded) {
+        this.uploadTile_();
+      } else {
+        if (tile instanceof ImageTile$1) {
+          const image = tile.getImage();
+          if (image instanceof Image && !image.crossOrigin) {
+            image.crossOrigin = "anonymous";
           }
         }
+        tile.addEventListener(EventType.CHANGE, this.handleTileChange_);
       }
     }
-    tileSource.updateCacheSize(tileCount, projection);
+  }
+  uploadTile_() {
+    const helper = this.helper_;
+    const gl = helper.getGL();
+    const tile = this.tile;
+    if (tile instanceof ImageTile$1 || tile instanceof ReprojTile$1) {
+      const texture = gl.createTexture();
+      this.textures.push(texture);
+      this.bandCount = 4;
+      uploadImageTexture(gl, texture, tile.getImage(), tile.interpolate);
+      return;
+    }
+    const sourceTileSize = tile.getSize();
+    const pixelSize = [
+      sourceTileSize[0] + 2 * this.gutter_,
+      sourceTileSize[1] + 2 * this.gutter_
+    ];
+    const data = tile.getData();
+    const isFloat = data instanceof Float32Array;
+    const pixelCount = pixelSize[0] * pixelSize[1];
+    const DataType = isFloat ? Float32Array : Uint8Array;
+    const bytesPerElement = DataType.BYTES_PER_ELEMENT;
+    const bytesPerRow = data.byteLength / pixelSize[1];
+    this.bandCount = Math.floor(bytesPerRow / bytesPerElement / pixelSize[0]);
+    const textureCount = Math.ceil(this.bandCount / 4);
+    if (textureCount === 1) {
+      const texture = gl.createTexture();
+      this.textures.push(texture);
+      uploadDataTexture(
+        helper,
+        texture,
+        data,
+        pixelSize,
+        this.bandCount,
+        tile.interpolate
+      );
+      return;
+    }
+    const textureDataArrays = new Array(textureCount);
+    for (let textureIndex = 0; textureIndex < textureCount; ++textureIndex) {
+      const texture = gl.createTexture();
+      this.textures.push(texture);
+      const bandCount = textureIndex < textureCount - 1 ? 4 : (this.bandCount - 1) % 4 + 1;
+      textureDataArrays[textureIndex] = new DataType(pixelCount * bandCount);
+    }
+    let dataIndex = 0;
+    let rowOffset = 0;
+    const colCount = pixelSize[0] * this.bandCount;
+    for (let rowIndex = 0; rowIndex < pixelSize[1]; ++rowIndex) {
+      for (let colIndex = 0; colIndex < colCount; ++colIndex) {
+        const dataValue = data[rowOffset + colIndex];
+        const pixelIndex = Math.floor(dataIndex / this.bandCount);
+        const bandIndex = colIndex % this.bandCount;
+        const textureIndex = Math.floor(bandIndex / 4);
+        const textureData = textureDataArrays[textureIndex];
+        const bandCount = textureData.length / pixelCount;
+        const textureBandIndex = bandIndex % 4;
+        textureData[pixelIndex * bandCount + textureBandIndex] = dataValue;
+        ++dataIndex;
+      }
+      rowOffset += bytesPerRow / bytesPerElement;
+    }
+    for (let textureIndex = 0; textureIndex < textureCount; ++textureIndex) {
+      const texture = this.textures[textureIndex];
+      const textureData = textureDataArrays[textureIndex];
+      const bandCount = textureData.length / pixelCount;
+      uploadDataTexture(
+        helper,
+        texture,
+        textureData,
+        pixelSize,
+        bandCount,
+        tile.interpolate
+      );
+    }
+  }
+  handleTileChange_() {
+    if (this.tile.getState() === TileState.LOADED) {
+      this.loaded = true;
+      this.uploadTile_();
+      this.dispatchEvent(EventType.CHANGE);
+    }
+  }
+  disposeInternal() {
+    const gl = this.helper_.getGL();
+    this.helper_.deleteBuffer(this.coords);
+    for (let i = 0; i < this.textures.length; ++i) {
+      gl.deleteTexture(this.textures[i]);
+    }
+    this.tile.removeEventListener(EventType.CHANGE, this.handleTileChange_);
+  }
+  getPixelData(renderCol, renderRow) {
+    if (!this.loaded) {
+      return null;
+    }
+    const renderWidth = this.renderSize_[0];
+    const renderHeight = this.renderSize_[1];
+    const gutter = this.gutter_;
+    if (this.tile instanceof DataTile$1) {
+      const sourceSize = this.tile.getSize();
+      const sourceWidthWithoutGutter2 = sourceSize[0];
+      const sourceHeightWithoutGutter2 = sourceSize[1];
+      const sourceWidth2 = sourceWidthWithoutGutter2 + 2 * gutter;
+      const sourceHeight2 = sourceHeightWithoutGutter2 + 2 * gutter;
+      const sourceCol2 = gutter + Math.floor(sourceWidthWithoutGutter2 * (renderCol / renderWidth));
+      const sourceRow2 = gutter + Math.floor(sourceHeightWithoutGutter2 * (renderRow / renderHeight));
+      const data2 = this.tile.getData();
+      if (data2 instanceof DataView) {
+        const bytesPerPixel = data2.byteLength / (sourceWidth2 * sourceHeight2);
+        const offset2 = bytesPerPixel * (sourceRow2 * sourceWidth2 + sourceCol2);
+        const buffer = data2.buffer.slice(offset2, offset2 + bytesPerPixel);
+        return new DataView(buffer);
+      }
+      const offset = this.bandCount * (sourceRow2 * sourceWidth2 + sourceCol2);
+      return data2.slice(offset, offset + this.bandCount);
+    }
+    if (!pixelContext$1) {
+      createPixelContext$1();
+    }
+    pixelContext$1.clearRect(0, 0, 1, 1);
+    const image = this.tile.getImage();
+    const sourceWidth = image.width;
+    const sourceHeight = image.height;
+    const sourceWidthWithoutGutter = sourceWidth - 2 * gutter;
+    const sourceHeightWithoutGutter = sourceHeight - 2 * gutter;
+    const sourceCol = gutter + Math.floor(sourceWidthWithoutGutter * (renderCol / renderWidth));
+    const sourceRow = gutter + Math.floor(sourceHeightWithoutGutter * (renderRow / renderHeight));
+    let data;
+    try {
+      pixelContext$1.drawImage(image, sourceCol, sourceRow, 1, 1, 0, 0, 1, 1);
+      data = pixelContext$1.getImageData(0, 0, 1, 1).data;
+    } catch (err) {
+      pixelContext$1 = null;
+      return null;
+    }
+    return data;
   }
 }
-const CanvasTileLayerRenderer$1 = CanvasTileLayerRenderer;
-class TileLayer extends BaseTileLayer$1 {
+const TileTexture$1 = TileTexture;
+class LayerRenderer extends Observable$1 {
+  constructor(layer) {
+    super();
+    this.ready = true;
+    this.boundHandleImageChange_ = this.handleImageChange_.bind(this);
+    this.layer_ = layer;
+    this.declutterExecutorGroup = null;
+  }
+  getFeatures(pixel) {
+    return abstract();
+  }
+  getData(pixel) {
+    return null;
+  }
+  prepareFrame(frameState) {
+    return abstract();
+  }
+  renderFrame(frameState, target) {
+    return abstract();
+  }
+  loadedTileCallback(tiles, zoom, tile) {
+    if (!tiles[zoom]) {
+      tiles[zoom] = {};
+    }
+    tiles[zoom][tile.tileCoord.toString()] = tile;
+    return void 0;
+  }
+  createLoadedTileFinder(source, projection, tiles) {
+    return function(zoom, tileRange) {
+      const callback = this.loadedTileCallback.bind(this, tiles, zoom);
+      return source.forEachLoadedTile(projection, zoom, tileRange, callback);
+    }.bind(this);
+  }
+  forEachFeatureAtCoordinate(coordinate, frameState, hitTolerance, callback, matches) {
+    return void 0;
+  }
+  getLayer() {
+    return this.layer_;
+  }
+  handleFontsChanged() {
+  }
+  handleImageChange_(event) {
+    const image = event.target;
+    if (image.getState() === ImageState.LOADED) {
+      this.renderIfReadyAndVisible();
+    }
+  }
+  loadImage(image) {
+    let imageState = image.getState();
+    if (imageState != ImageState.LOADED && imageState != ImageState.ERROR) {
+      image.addEventListener(EventType.CHANGE, this.boundHandleImageChange_);
+    }
+    if (imageState == ImageState.IDLE) {
+      image.load();
+      imageState = image.getState();
+    }
+    return imageState == ImageState.LOADED;
+  }
+  renderIfReadyAndVisible() {
+    const layer = this.getLayer();
+    if (layer && layer.getVisible() && layer.getSourceState() === "ready") {
+      layer.changed();
+    }
+  }
+  disposeInternal() {
+    delete this.layer_;
+    super.disposeInternal();
+  }
+}
+const LayerRenderer$1 = LayerRenderer;
+const ContextEventType = {
+  LOST: "webglcontextlost",
+  RESTORED: "webglcontextrestored"
+};
+const DEFAULT_VERTEX_SHADER = `
+  precision mediump float;
+  
+  attribute vec2 a_position;
+  varying vec2 v_texCoord;
+  varying vec2 v_screenCoord;
+  
+  uniform vec2 u_screenSize;
+   
+  void main() {
+    v_texCoord = a_position * 0.5 + 0.5;
+    v_screenCoord = v_texCoord * u_screenSize;
+    gl_Position = vec4(a_position, 0.0, 1.0);
+  }
+`;
+const DEFAULT_FRAGMENT_SHADER = `
+  precision mediump float;
+   
+  uniform sampler2D u_image;
+  uniform float u_opacity;
+   
+  varying vec2 v_texCoord;
+   
+  void main() {
+    gl_FragColor = texture2D(u_image, v_texCoord) * u_opacity;
+  }
+`;
+class WebGLPostProcessingPass {
   constructor(options) {
-    super(options);
+    this.gl_ = options.webGlContext;
+    const gl = this.gl_;
+    this.scaleRatio_ = options.scaleRatio || 1;
+    this.renderTargetTexture_ = gl.createTexture();
+    this.renderTargetTextureSize_ = null;
+    this.frameBuffer_ = gl.createFramebuffer();
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(
+      vertexShader,
+      options.vertexShader || DEFAULT_VERTEX_SHADER
+    );
+    gl.compileShader(vertexShader);
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(
+      fragmentShader,
+      options.fragmentShader || DEFAULT_FRAGMENT_SHADER
+    );
+    gl.compileShader(fragmentShader);
+    this.renderTargetProgram_ = gl.createProgram();
+    gl.attachShader(this.renderTargetProgram_, vertexShader);
+    gl.attachShader(this.renderTargetProgram_, fragmentShader);
+    gl.linkProgram(this.renderTargetProgram_);
+    this.renderTargetVerticesBuffer_ = gl.createBuffer();
+    const verticesArray = [-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1];
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.renderTargetVerticesBuffer_);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(verticesArray),
+      gl.STATIC_DRAW
+    );
+    this.renderTargetAttribLocation_ = gl.getAttribLocation(
+      this.renderTargetProgram_,
+      "a_position"
+    );
+    this.renderTargetUniformLocation_ = gl.getUniformLocation(
+      this.renderTargetProgram_,
+      "u_screenSize"
+    );
+    this.renderTargetOpacityLocation_ = gl.getUniformLocation(
+      this.renderTargetProgram_,
+      "u_opacity"
+    );
+    this.renderTargetTextureLocation_ = gl.getUniformLocation(
+      this.renderTargetProgram_,
+      "u_image"
+    );
+    this.uniforms_ = [];
+    options.uniforms && Object.keys(options.uniforms).forEach(
+      function(name) {
+        this.uniforms_.push({
+          value: options.uniforms[name],
+          location: gl.getUniformLocation(this.renderTargetProgram_, name)
+        });
+      }.bind(this)
+    );
   }
-  createRenderer() {
-    return new CanvasTileLayerRenderer$1(this);
+  getGL() {
+    return this.gl_;
+  }
+  init(frameState) {
+    const gl = this.getGL();
+    const textureSize = [
+      gl.drawingBufferWidth * this.scaleRatio_,
+      gl.drawingBufferHeight * this.scaleRatio_
+    ];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.getFrameBuffer());
+    gl.viewport(0, 0, textureSize[0], textureSize[1]);
+    if (!this.renderTargetTextureSize_ || this.renderTargetTextureSize_[0] !== textureSize[0] || this.renderTargetTextureSize_[1] !== textureSize[1]) {
+      this.renderTargetTextureSize_ = textureSize;
+      const level = 0;
+      const internalFormat = gl.RGBA;
+      const border = 0;
+      const format = gl.RGBA;
+      const type = gl.UNSIGNED_BYTE;
+      const data = null;
+      gl.bindTexture(gl.TEXTURE_2D, this.renderTargetTexture_);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        level,
+        internalFormat,
+        textureSize[0],
+        textureSize[1],
+        border,
+        format,
+        type,
+        data
+      );
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        this.renderTargetTexture_,
+        0
+      );
+    }
+  }
+  apply(frameState, nextPass, preCompose, postCompose) {
+    const gl = this.getGL();
+    const size = frameState.size;
+    gl.bindFramebuffer(
+      gl.FRAMEBUFFER,
+      nextPass ? nextPass.getFrameBuffer() : null
+    );
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.renderTargetTexture_);
+    if (!nextPass) {
+      const canvasId = getUid(gl.canvas);
+      if (!frameState.renderTargets[canvasId]) {
+        const attributes = gl.getContextAttributes();
+        if (attributes && attributes.preserveDrawingBuffer) {
+          gl.clearColor(0, 0, 0, 0);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        frameState.renderTargets[canvasId] = true;
+      }
+    }
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.renderTargetVerticesBuffer_);
+    gl.useProgram(this.renderTargetProgram_);
+    gl.enableVertexAttribArray(this.renderTargetAttribLocation_);
+    gl.vertexAttribPointer(
+      this.renderTargetAttribLocation_,
+      2,
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
+    gl.uniform2f(this.renderTargetUniformLocation_, size[0], size[1]);
+    gl.uniform1i(this.renderTargetTextureLocation_, 0);
+    const opacity = frameState.layerStatesArray[frameState.layerIndex].opacity;
+    gl.uniform1f(this.renderTargetOpacityLocation_, opacity);
+    this.applyUniforms(frameState);
+    if (preCompose) {
+      preCompose(gl, frameState);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (postCompose) {
+      postCompose(gl, frameState);
+    }
+  }
+  getFrameBuffer() {
+    return this.frameBuffer_;
+  }
+  applyUniforms(frameState) {
+    const gl = this.getGL();
+    let value;
+    let textureSlot = 1;
+    this.uniforms_.forEach(function(uniform) {
+      value = typeof uniform.value === "function" ? uniform.value(frameState) : uniform.value;
+      if (value instanceof HTMLCanvasElement || value instanceof ImageData) {
+        if (!uniform.texture) {
+          uniform.texture = gl.createTexture();
+        }
+        gl.activeTexture(gl[`TEXTURE${textureSlot}`]);
+        gl.bindTexture(gl.TEXTURE_2D, uniform.texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        if (value instanceof ImageData) {
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            value.width,
+            value.height,
+            0,
+            gl.UNSIGNED_BYTE,
+            new Uint8Array(value.data)
+          );
+        } else {
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            value
+          );
+        }
+        gl.uniform1i(uniform.location, textureSlot++);
+      } else if (Array.isArray(value)) {
+        switch (value.length) {
+          case 2:
+            gl.uniform2f(uniform.location, value[0], value[1]);
+            return;
+          case 3:
+            gl.uniform3f(uniform.location, value[0], value[1], value[2]);
+            return;
+          case 4:
+            gl.uniform4f(
+              uniform.location,
+              value[0],
+              value[1],
+              value[2],
+              value[3]
+            );
+            return;
+          default:
+            return;
+        }
+      } else if (typeof value === "number") {
+        gl.uniform1f(uniform.location, value);
+      }
+    });
   }
 }
-const TileLayer$1 = TileLayer;
+const WebGLPostProcessingPass$1 = WebGLPostProcessingPass;
+function create() {
+  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+}
+function fromTransform(mat4, transform2) {
+  mat4[0] = transform2[0];
+  mat4[1] = transform2[1];
+  mat4[4] = transform2[2];
+  mat4[5] = transform2[3];
+  mat4[12] = transform2[4];
+  mat4[13] = transform2[5];
+  return mat4;
+}
+const DefaultUniform = {
+  PROJECTION_MATRIX: "u_projectionMatrix",
+  OFFSET_SCALE_MATRIX: "u_offsetScaleMatrix",
+  OFFSET_ROTATION_MATRIX: "u_offsetRotateMatrix",
+  TIME: "u_time",
+  ZOOM: "u_zoom",
+  RESOLUTION: "u_resolution",
+  SIZE_PX: "u_sizePx",
+  PIXEL_RATIO: "u_pixelRatio"
+};
+const AttributeType = {
+  UNSIGNED_BYTE,
+  UNSIGNED_SHORT,
+  UNSIGNED_INT,
+  FLOAT
+};
+const canvasCache = {};
+function getSharedCanvasCacheKey(key) {
+  return "shared/" + key;
+}
+let uniqueCanvasCacheKeyCount = 0;
+function getUniqueCanvasCacheKey() {
+  const key = "unique/" + uniqueCanvasCacheKeyCount;
+  uniqueCanvasCacheKeyCount += 1;
+  return key;
+}
+function getCanvas(key) {
+  let cacheItem = canvasCache[key];
+  if (!cacheItem) {
+    const canvas = document.createElement("canvas");
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    cacheItem = { users: 0, canvas };
+    canvasCache[key] = cacheItem;
+  }
+  cacheItem.users += 1;
+  return cacheItem.canvas;
+}
+function releaseCanvas(key) {
+  const cacheItem = canvasCache[key];
+  if (!cacheItem) {
+    return;
+  }
+  cacheItem.users -= 1;
+  if (cacheItem.users > 0) {
+    return;
+  }
+  const canvas = cacheItem.canvas;
+  const gl = getContext(canvas);
+  const extension = gl.getExtension("WEBGL_lose_context");
+  if (extension) {
+    extension.loseContext();
+  }
+  delete canvasCache[key];
+}
+class WebGLHelper extends Disposable$1 {
+  constructor(options) {
+    super();
+    options = options || {};
+    this.boundHandleWebGLContextLost_ = this.handleWebGLContextLost.bind(this);
+    this.boundHandleWebGLContextRestored_ = this.handleWebGLContextRestored.bind(this);
+    this.canvasCacheKey_ = options.canvasCacheKey ? getSharedCanvasCacheKey(options.canvasCacheKey) : getUniqueCanvasCacheKey();
+    this.canvas_ = getCanvas(this.canvasCacheKey_);
+    this.gl_ = getContext(this.canvas_);
+    this.bufferCache_ = {};
+    this.extensionCache_ = {};
+    this.currentProgram_ = null;
+    this.canvas_.addEventListener(
+      ContextEventType.LOST,
+      this.boundHandleWebGLContextLost_
+    );
+    this.canvas_.addEventListener(
+      ContextEventType.RESTORED,
+      this.boundHandleWebGLContextRestored_
+    );
+    this.offsetRotateMatrix_ = create$1();
+    this.offsetScaleMatrix_ = create$1();
+    this.tmpMat4_ = create();
+    this.uniformLocations_ = {};
+    this.attribLocations_ = {};
+    this.uniforms_ = [];
+    if (options.uniforms) {
+      this.setUniforms(options.uniforms);
+    }
+    const gl = this.getGL();
+    this.postProcessPasses_ = options.postProcesses ? options.postProcesses.map(function(options2) {
+      return new WebGLPostProcessingPass$1({
+        webGlContext: gl,
+        scaleRatio: options2.scaleRatio,
+        vertexShader: options2.vertexShader,
+        fragmentShader: options2.fragmentShader,
+        uniforms: options2.uniforms
+      });
+    }) : [new WebGLPostProcessingPass$1({ webGlContext: gl })];
+    this.shaderCompileErrors_ = null;
+    this.startTime_ = Date.now();
+  }
+  setUniforms(uniforms) {
+    this.uniforms_ = [];
+    for (const name in uniforms) {
+      this.uniforms_.push({
+        name,
+        value: uniforms[name]
+      });
+    }
+    this.uniformLocations_ = {};
+  }
+  canvasCacheKeyMatches(canvasCacheKey) {
+    return this.canvasCacheKey_ === getSharedCanvasCacheKey(canvasCacheKey);
+  }
+  getExtension(name) {
+    if (name in this.extensionCache_) {
+      return this.extensionCache_[name];
+    }
+    const extension = this.gl_.getExtension(name);
+    this.extensionCache_[name] = extension;
+    return extension;
+  }
+  bindBuffer(buffer) {
+    const gl = this.getGL();
+    const bufferKey = getUid(buffer);
+    let bufferCache = this.bufferCache_[bufferKey];
+    if (!bufferCache) {
+      const webGlBuffer = gl.createBuffer();
+      bufferCache = {
+        buffer,
+        webGlBuffer
+      };
+      this.bufferCache_[bufferKey] = bufferCache;
+    }
+    gl.bindBuffer(buffer.getType(), bufferCache.webGlBuffer);
+  }
+  flushBufferData(buffer) {
+    const gl = this.getGL();
+    this.bindBuffer(buffer);
+    gl.bufferData(buffer.getType(), buffer.getArray(), buffer.getUsage());
+  }
+  deleteBuffer(buf) {
+    const gl = this.getGL();
+    const bufferKey = getUid(buf);
+    const bufferCacheEntry = this.bufferCache_[bufferKey];
+    if (bufferCacheEntry && !gl.isContextLost()) {
+      gl.deleteBuffer(bufferCacheEntry.webGlBuffer);
+    }
+    delete this.bufferCache_[bufferKey];
+  }
+  disposeInternal() {
+    this.canvas_.removeEventListener(
+      ContextEventType.LOST,
+      this.boundHandleWebGLContextLost_
+    );
+    this.canvas_.removeEventListener(
+      ContextEventType.RESTORED,
+      this.boundHandleWebGLContextRestored_
+    );
+    releaseCanvas(this.canvasCacheKey_);
+    delete this.gl_;
+    delete this.canvas_;
+  }
+  prepareDraw(frameState, disableAlphaBlend) {
+    const gl = this.getGL();
+    const canvas = this.getCanvas();
+    const size = frameState.size;
+    const pixelRatio = frameState.pixelRatio;
+    canvas.width = size[0] * pixelRatio;
+    canvas.height = size[1] * pixelRatio;
+    canvas.style.width = size[0] + "px";
+    canvas.style.height = size[1] + "px";
+    for (let i = this.postProcessPasses_.length - 1; i >= 0; i--) {
+      this.postProcessPasses_[i].init(frameState);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, disableAlphaBlend ? gl.ZERO : gl.ONE_MINUS_SRC_ALPHA);
+  }
+  prepareDrawToRenderTarget(frameState, renderTarget, disableAlphaBlend) {
+    const gl = this.getGL();
+    const size = renderTarget.getSize();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget.getFramebuffer());
+    gl.viewport(0, 0, size[0], size[1]);
+    gl.bindTexture(gl.TEXTURE_2D, renderTarget.getTexture());
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, disableAlphaBlend ? gl.ZERO : gl.ONE_MINUS_SRC_ALPHA);
+  }
+  drawElements(start, end) {
+    const gl = this.getGL();
+    this.getExtension("OES_element_index_uint");
+    const elementType = gl.UNSIGNED_INT;
+    const elementSize = 4;
+    const numItems = end - start;
+    const offsetInBytes = start * elementSize;
+    gl.drawElements(gl.TRIANGLES, numItems, elementType, offsetInBytes);
+  }
+  finalizeDraw(frameState, preCompose, postCompose) {
+    for (let i = 0, ii = this.postProcessPasses_.length; i < ii; i++) {
+      if (i === ii - 1) {
+        this.postProcessPasses_[i].apply(
+          frameState,
+          null,
+          preCompose,
+          postCompose
+        );
+      } else {
+        this.postProcessPasses_[i].apply(
+          frameState,
+          this.postProcessPasses_[i + 1]
+        );
+      }
+    }
+  }
+  getCanvas() {
+    return this.canvas_;
+  }
+  getGL() {
+    return this.gl_;
+  }
+  applyFrameState(frameState) {
+    const size = frameState.size;
+    const rotation = frameState.viewState.rotation;
+    const pixelRatio = frameState.pixelRatio;
+    const offsetScaleMatrix = reset(this.offsetScaleMatrix_);
+    scale$3(offsetScaleMatrix, 2 / size[0], 2 / size[1]);
+    const offsetRotateMatrix = reset(this.offsetRotateMatrix_);
+    if (rotation !== 0) {
+      rotate$2(offsetRotateMatrix, -rotation);
+    }
+    this.setUniformMatrixValue(
+      DefaultUniform.OFFSET_SCALE_MATRIX,
+      fromTransform(this.tmpMat4_, offsetScaleMatrix)
+    );
+    this.setUniformMatrixValue(
+      DefaultUniform.OFFSET_ROTATION_MATRIX,
+      fromTransform(this.tmpMat4_, offsetRotateMatrix)
+    );
+    this.setUniformFloatValue(
+      DefaultUniform.TIME,
+      (Date.now() - this.startTime_) * 1e-3
+    );
+    this.setUniformFloatValue(DefaultUniform.ZOOM, frameState.viewState.zoom);
+    this.setUniformFloatValue(
+      DefaultUniform.RESOLUTION,
+      frameState.viewState.resolution
+    );
+    this.setUniformFloatValue(DefaultUniform.PIXEL_RATIO, pixelRatio);
+    this.setUniformFloatVec2(DefaultUniform.SIZE_PX, [size[0], size[1]]);
+  }
+  applyUniforms(frameState) {
+    const gl = this.getGL();
+    let value;
+    let textureSlot = 0;
+    this.uniforms_.forEach(
+      function(uniform) {
+        value = typeof uniform.value === "function" ? uniform.value(frameState) : uniform.value;
+        if (value instanceof HTMLCanvasElement || value instanceof HTMLImageElement || value instanceof ImageData) {
+          if (!uniform.texture) {
+            uniform.prevValue = void 0;
+            uniform.texture = gl.createTexture();
+          }
+          gl.activeTexture(gl[`TEXTURE${textureSlot}`]);
+          gl.bindTexture(gl.TEXTURE_2D, uniform.texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          const imageReady = !(value instanceof HTMLImageElement) || value.complete;
+          if (imageReady && uniform.prevValue !== value) {
+            uniform.prevValue = value;
+            gl.texImage2D(
+              gl.TEXTURE_2D,
+              0,
+              gl.RGBA,
+              gl.RGBA,
+              gl.UNSIGNED_BYTE,
+              value
+            );
+          }
+          gl.uniform1i(this.getUniformLocation(uniform.name), textureSlot++);
+        } else if (Array.isArray(value) && value.length === 6) {
+          this.setUniformMatrixValue(
+            uniform.name,
+            fromTransform(this.tmpMat4_, value)
+          );
+        } else if (Array.isArray(value) && value.length <= 4) {
+          switch (value.length) {
+            case 2:
+              gl.uniform2f(
+                this.getUniformLocation(uniform.name),
+                value[0],
+                value[1]
+              );
+              return;
+            case 3:
+              gl.uniform3f(
+                this.getUniformLocation(uniform.name),
+                value[0],
+                value[1],
+                value[2]
+              );
+              return;
+            case 4:
+              gl.uniform4f(
+                this.getUniformLocation(uniform.name),
+                value[0],
+                value[1],
+                value[2],
+                value[3]
+              );
+              return;
+            default:
+              return;
+          }
+        } else if (typeof value === "number") {
+          gl.uniform1f(this.getUniformLocation(uniform.name), value);
+        }
+      }.bind(this)
+    );
+  }
+  useProgram(program, frameState) {
+    const gl = this.getGL();
+    gl.useProgram(program);
+    this.currentProgram_ = program;
+    this.uniformLocations_ = {};
+    this.attribLocations_ = {};
+    this.applyFrameState(frameState);
+    this.applyUniforms(frameState);
+  }
+  compileShader(source, type) {
+    const gl = this.getGL();
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    return shader;
+  }
+  getProgram(fragmentShaderSource, vertexShaderSource) {
+    const gl = this.getGL();
+    const fragmentShader = this.compileShader(
+      fragmentShaderSource,
+      gl.FRAGMENT_SHADER
+    );
+    const vertexShader = this.compileShader(
+      vertexShaderSource,
+      gl.VERTEX_SHADER
+    );
+    const program = gl.createProgram();
+    gl.attachShader(program, fragmentShader);
+    gl.attachShader(program, vertexShader);
+    gl.linkProgram(program);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+      const message = `Fragment shader compliation failed: ${gl.getShaderInfoLog(
+        fragmentShader
+      )}`;
+      throw new Error(message);
+    }
+    gl.deleteShader(fragmentShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+      const message = `Vertex shader compilation failed: ${gl.getShaderInfoLog(
+        vertexShader
+      )}`;
+      throw new Error(message);
+    }
+    gl.deleteShader(vertexShader);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const message = `GL program linking failed: ${gl.getShaderInfoLog(
+        vertexShader
+      )}`;
+      throw new Error(message);
+    }
+    return program;
+  }
+  getUniformLocation(name) {
+    if (this.uniformLocations_[name] === void 0) {
+      this.uniformLocations_[name] = this.getGL().getUniformLocation(
+        this.currentProgram_,
+        name
+      );
+    }
+    return this.uniformLocations_[name];
+  }
+  getAttributeLocation(name) {
+    if (this.attribLocations_[name] === void 0) {
+      this.attribLocations_[name] = this.getGL().getAttribLocation(
+        this.currentProgram_,
+        name
+      );
+    }
+    return this.attribLocations_[name];
+  }
+  makeProjectionTransform(frameState, transform2) {
+    const size = frameState.size;
+    const rotation = frameState.viewState.rotation;
+    const resolution = frameState.viewState.resolution;
+    const center = frameState.viewState.center;
+    reset(transform2);
+    compose(
+      transform2,
+      0,
+      0,
+      2 / (resolution * size[0]),
+      2 / (resolution * size[1]),
+      -rotation,
+      -center[0],
+      -center[1]
+    );
+    return transform2;
+  }
+  setUniformFloatValue(uniform, value) {
+    this.getGL().uniform1f(this.getUniformLocation(uniform), value);
+  }
+  setUniformFloatVec2(uniform, value) {
+    this.getGL().uniform2fv(this.getUniformLocation(uniform), value);
+  }
+  setUniformFloatVec4(uniform, value) {
+    this.getGL().uniform4fv(this.getUniformLocation(uniform), value);
+  }
+  setUniformMatrixValue(uniform, value) {
+    this.getGL().uniformMatrix4fv(
+      this.getUniformLocation(uniform),
+      false,
+      value
+    );
+  }
+  enableAttributeArray_(attribName, size, type, stride, offset) {
+    const location = this.getAttributeLocation(attribName);
+    if (location < 0) {
+      return;
+    }
+    this.getGL().enableVertexAttribArray(location);
+    this.getGL().vertexAttribPointer(
+      location,
+      size,
+      type,
+      false,
+      stride,
+      offset
+    );
+  }
+  enableAttributes(attributes) {
+    const stride = computeAttributesStride(attributes);
+    let offset = 0;
+    for (let i = 0; i < attributes.length; i++) {
+      const attr = attributes[i];
+      this.enableAttributeArray_(
+        attr.name,
+        attr.size,
+        attr.type || FLOAT,
+        stride,
+        offset
+      );
+      offset += attr.size * getByteSizeFromType(attr.type);
+    }
+  }
+  handleWebGLContextLost() {
+    clear(this.bufferCache_);
+    this.currentProgram_ = null;
+  }
+  handleWebGLContextRestored() {
+  }
+  createTexture(size, data, texture) {
+    const gl = this.getGL();
+    texture = texture || gl.createTexture();
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const border = 0;
+    const format = gl.RGBA;
+    const type = gl.UNSIGNED_BYTE;
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    if (data) {
+      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, format, type, data);
+    } else {
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        level,
+        internalFormat,
+        size[0],
+        size[1],
+        border,
+        format,
+        type,
+        null
+      );
+    }
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return texture;
+  }
+}
+function computeAttributesStride(attributes) {
+  let stride = 0;
+  for (let i = 0; i < attributes.length; i++) {
+    const attr = attributes[i];
+    stride += attr.size * getByteSizeFromType(attr.type);
+  }
+  return stride;
+}
+function getByteSizeFromType(type) {
+  switch (type) {
+    case AttributeType.UNSIGNED_BYTE:
+      return Uint8Array.BYTES_PER_ELEMENT;
+    case AttributeType.UNSIGNED_SHORT:
+      return Uint16Array.BYTES_PER_ELEMENT;
+    case AttributeType.UNSIGNED_INT:
+      return Uint32Array.BYTES_PER_ELEMENT;
+    case AttributeType.FLOAT:
+    default:
+      return Float32Array.BYTES_PER_ELEMENT;
+  }
+}
+class WebGLLayerRenderer extends LayerRenderer$1 {
+  constructor(layer, options) {
+    super(layer);
+    options = options || {};
+    this.inversePixelTransform_ = create$1();
+    this.pixelContext_ = null;
+    this.postProcesses_ = options.postProcesses;
+    this.uniforms_ = options.uniforms;
+    this.helper;
+    layer.addChangeListener(LayerProperty.MAP, this.removeHelper.bind(this));
+    this.dispatchPreComposeEvent = this.dispatchPreComposeEvent.bind(this);
+    this.dispatchPostComposeEvent = this.dispatchPostComposeEvent.bind(this);
+  }
+  dispatchPreComposeEvent(context2, frameState) {
+    const layer = this.getLayer();
+    if (layer.hasListener(RenderEventType.PRECOMPOSE)) {
+      const event = new RenderEvent$1(
+        RenderEventType.PRECOMPOSE,
+        void 0,
+        frameState,
+        context2
+      );
+      layer.dispatchEvent(event);
+    }
+  }
+  dispatchPostComposeEvent(context2, frameState) {
+    const layer = this.getLayer();
+    if (layer.hasListener(RenderEventType.POSTCOMPOSE)) {
+      const event = new RenderEvent$1(
+        RenderEventType.POSTCOMPOSE,
+        void 0,
+        frameState,
+        context2
+      );
+      layer.dispatchEvent(event);
+    }
+  }
+  reset(options) {
+    this.uniforms_ = options.uniforms;
+    if (this.helper) {
+      this.helper.setUniforms(this.uniforms_);
+    }
+  }
+  removeHelper() {
+    if (this.helper) {
+      this.helper.dispose();
+      delete this.helper;
+    }
+  }
+  prepareFrame(frameState) {
+    if (this.getLayer().getRenderSource()) {
+      let incrementGroup = true;
+      let groupNumber = -1;
+      let className;
+      for (let i = 0, ii = frameState.layerStatesArray.length; i < ii; i++) {
+        const layer = frameState.layerStatesArray[i].layer;
+        const renderer = layer.getRenderer();
+        if (!(renderer instanceof WebGLLayerRenderer)) {
+          incrementGroup = true;
+          continue;
+        }
+        const layerClassName = layer.getClassName();
+        if (incrementGroup || layerClassName !== className) {
+          groupNumber += 1;
+          incrementGroup = false;
+        }
+        className = layerClassName;
+        if (renderer === this) {
+          break;
+        }
+      }
+      const canvasCacheKey = "map/" + frameState.mapId + "/group/" + groupNumber;
+      if (!this.helper || !this.helper.canvasCacheKeyMatches(canvasCacheKey)) {
+        this.removeHelper();
+        this.helper = new WebGLHelper({
+          postProcesses: this.postProcesses_,
+          uniforms: this.uniforms_,
+          canvasCacheKey
+        });
+        if (className) {
+          this.helper.getCanvas().className = className;
+        }
+        this.afterHelperCreated();
+      }
+    }
+    return this.prepareFrameInternal(frameState);
+  }
+  afterHelperCreated() {
+  }
+  prepareFrameInternal(frameState) {
+    return true;
+  }
+  disposeInternal() {
+    this.removeHelper();
+    super.disposeInternal();
+  }
+  dispatchRenderEvent_(type, context2, frameState) {
+    const layer = this.getLayer();
+    if (layer.hasListener(type)) {
+      compose(
+        this.inversePixelTransform_,
+        0,
+        0,
+        frameState.pixelRatio,
+        -frameState.pixelRatio,
+        0,
+        0,
+        -frameState.size[1]
+      );
+      const event = new RenderEvent$1(
+        type,
+        this.inversePixelTransform_,
+        frameState,
+        context2
+      );
+      layer.dispatchEvent(event);
+    }
+  }
+  preRender(context2, frameState) {
+    this.dispatchRenderEvent_(RenderEventType.PRERENDER, context2, frameState);
+  }
+  postRender(context2, frameState) {
+    this.dispatchRenderEvent_(RenderEventType.POSTRENDER, context2, frameState);
+  }
+}
+const WebGLLayerRenderer$1 = WebGLLayerRenderer;
 function createOrUpdate(z, x, y, tileCoord) {
   if (tileCoord !== void 0) {
     tileCoord[0] = z;
@@ -9576,6 +10449,1637 @@ function withinExtentAndZ(tileCoord, tileGrid) {
     return tileRange.containsXY(x, y);
   }
 }
+const Uniforms = {
+  TILE_TEXTURE_ARRAY: "u_tileTextures",
+  TILE_TRANSFORM: "u_tileTransform",
+  TRANSITION_ALPHA: "u_transitionAlpha",
+  DEPTH: "u_depth",
+  TEXTURE_PIXEL_WIDTH: "u_texturePixelWidth",
+  TEXTURE_PIXEL_HEIGHT: "u_texturePixelHeight",
+  TEXTURE_RESOLUTION: "u_textureResolution",
+  TEXTURE_ORIGIN_X: "u_textureOriginX",
+  TEXTURE_ORIGIN_Y: "u_textureOriginY",
+  RENDER_EXTENT: "u_renderExtent",
+  RESOLUTION: "u_resolution",
+  ZOOM: "u_zoom"
+};
+const Attributes = {
+  TEXTURE_COORD: "a_textureCoord"
+};
+const attributeDescriptions = [
+  {
+    name: Attributes.TEXTURE_COORD,
+    size: 2,
+    type: AttributeType.FLOAT
+  }
+];
+const empty = {};
+function depthForZ(z) {
+  return 2 * (1 - 1 / (z + 1)) - 1;
+}
+function addTileTextureToLookup(tileTexturesByZ, tileTexture, z) {
+  if (!(z in tileTexturesByZ)) {
+    tileTexturesByZ[z] = [];
+  }
+  tileTexturesByZ[z].push(tileTexture);
+}
+function getRenderExtent(frameState, extent2) {
+  const layerState = frameState.layerStatesArray[frameState.layerIndex];
+  if (layerState.extent) {
+    extent2 = getIntersection(
+      extent2,
+      fromUserExtent(layerState.extent, frameState.viewState.projection)
+    );
+  }
+  const source = layerState.layer.getRenderSource();
+  if (!source.getWrapX()) {
+    const gridExtent = source.getTileGridForProjection(frameState.viewState.projection).getExtent();
+    if (gridExtent) {
+      extent2 = getIntersection(extent2, gridExtent);
+    }
+  }
+  return extent2;
+}
+function getCacheKey(source, tileCoord) {
+  return `${source.getKey()},${getKey(tileCoord)}`;
+}
+class WebGLTileLayerRenderer extends WebGLLayerRenderer$1 {
+  constructor(tileLayer, options) {
+    super(tileLayer, {
+      uniforms: options.uniforms
+    });
+    this.renderComplete = false;
+    this.tileTransform_ = create$1();
+    this.tempMat4_ = create();
+    this.tempTileRange_ = new TileRange$1(0, 0, 0, 0);
+    this.tempTileCoord_ = createOrUpdate(0, 0, 0);
+    this.tempSize_ = [0, 0];
+    this.program_;
+    this.vertexShader_ = options.vertexShader;
+    this.fragmentShader_ = options.fragmentShader;
+    this.indices_ = new WebGLArrayBuffer$1(ELEMENT_ARRAY_BUFFER, STATIC_DRAW);
+    this.indices_.fromArray([0, 1, 3, 1, 2, 3]);
+    const cacheSize = options.cacheSize !== void 0 ? options.cacheSize : 512;
+    this.tileTextureCache_ = new LRUCache$1(cacheSize);
+    this.paletteTextures_ = options.paletteTextures || [];
+    this.frameState_ = null;
+    this.projection_ = void 0;
+  }
+  reset(options) {
+    super.reset({
+      uniforms: options.uniforms
+    });
+    this.vertexShader_ = options.vertexShader;
+    this.fragmentShader_ = options.fragmentShader;
+    this.paletteTextures_ = options.paletteTextures || [];
+    if (this.helper) {
+      this.program_ = this.helper.getProgram(
+        this.fragmentShader_,
+        this.vertexShader_
+      );
+    }
+  }
+  afterHelperCreated() {
+    this.program_ = this.helper.getProgram(
+      this.fragmentShader_,
+      this.vertexShader_
+    );
+    this.helper.flushBufferData(this.indices_);
+  }
+  isDrawableTile_(tile) {
+    const tileLayer = this.getLayer();
+    const tileState = tile.getState();
+    const useInterimTilesOnError = tileLayer.getUseInterimTilesOnError();
+    return tileState == TileState.LOADED || tileState == TileState.EMPTY || tileState == TileState.ERROR && !useInterimTilesOnError;
+  }
+  prepareFrameInternal(frameState) {
+    if (!this.projection_) {
+      this.projection_ = frameState.viewState.projection;
+    } else if (frameState.viewState.projection !== this.projection_) {
+      this.clearCache();
+      this.projection_ = frameState.viewState.projection;
+    }
+    const layer = this.getLayer();
+    const source = layer.getRenderSource();
+    if (!source) {
+      return false;
+    }
+    if (isEmpty(getRenderExtent(frameState, frameState.extent))) {
+      return false;
+    }
+    return source.getState() === "ready";
+  }
+  enqueueTiles(frameState, extent2, initialZ, tileTexturesByZ, preload) {
+    const viewState = frameState.viewState;
+    const tileLayer = this.getLayer();
+    const tileSource = tileLayer.getRenderSource();
+    const tileGrid = tileSource.getTileGridForProjection(viewState.projection);
+    const gutter = tileSource.getGutterForProjection(viewState.projection);
+    const tileSourceKey = getUid(tileSource);
+    if (!(tileSourceKey in frameState.wantedTiles)) {
+      frameState.wantedTiles[tileSourceKey] = {};
+    }
+    const wantedTiles = frameState.wantedTiles[tileSourceKey];
+    const tileTextureCache = this.tileTextureCache_;
+    const map2 = tileLayer.getMapInternal();
+    const minZ = Math.max(
+      initialZ - preload,
+      tileGrid.getMinZoom(),
+      tileGrid.getZForResolution(
+        Math.min(
+          tileLayer.getMaxResolution(),
+          map2 ? map2.getView().getResolutionForZoom(Math.max(tileLayer.getMinZoom(), 0)) : tileGrid.getResolution(0)
+        ),
+        tileSource.zDirection
+      )
+    );
+    for (let z = initialZ; z >= minZ; --z) {
+      const tileRange = tileGrid.getTileRangeForExtentAndZ(
+        extent2,
+        z,
+        this.tempTileRange_
+      );
+      const tileResolution = tileGrid.getResolution(z);
+      for (let x = tileRange.minX; x <= tileRange.maxX; ++x) {
+        for (let y = tileRange.minY; y <= tileRange.maxY; ++y) {
+          const tileCoord = createOrUpdate(z, x, y, this.tempTileCoord_);
+          const cacheKey = getCacheKey(tileSource, tileCoord);
+          let tileTexture;
+          let tile;
+          if (tileTextureCache.containsKey(cacheKey)) {
+            tileTexture = tileTextureCache.get(cacheKey);
+            tile = tileTexture.tile;
+          }
+          if (!tileTexture || tileTexture.tile.key !== tileSource.getKey()) {
+            tile = tileSource.getTile(
+              z,
+              x,
+              y,
+              frameState.pixelRatio,
+              viewState.projection
+            );
+            if (!tileTexture) {
+              tileTexture = new TileTexture$1({
+                tile,
+                grid: tileGrid,
+                helper: this.helper,
+                gutter
+              });
+              tileTextureCache.set(cacheKey, tileTexture);
+            } else {
+              if (this.isDrawableTile_(tile)) {
+                tileTexture.setTile(tile);
+              } else {
+                const interimTile = tile.getInterimTile();
+                tileTexture.setTile(interimTile);
+              }
+            }
+          }
+          addTileTextureToLookup(tileTexturesByZ, tileTexture, z);
+          const tileQueueKey = tile.getKey();
+          wantedTiles[tileQueueKey] = true;
+          if (tile.getState() === TileState.IDLE) {
+            if (!frameState.tileQueue.isKeyQueued(tileQueueKey)) {
+              frameState.tileQueue.enqueue([
+                tile,
+                tileSourceKey,
+                tileGrid.getTileCoordCenter(tileCoord),
+                tileResolution
+              ]);
+            }
+          }
+        }
+      }
+    }
+  }
+  renderFrame(frameState) {
+    this.frameState_ = frameState;
+    this.renderComplete = true;
+    const gl = this.helper.getGL();
+    this.preRender(gl, frameState);
+    const viewState = frameState.viewState;
+    const tileLayer = this.getLayer();
+    const tileSource = tileLayer.getRenderSource();
+    const tileGrid = tileSource.getTileGridForProjection(viewState.projection);
+    const gutter = tileSource.getGutterForProjection(viewState.projection);
+    const extent2 = getRenderExtent(frameState, frameState.extent);
+    const z = tileGrid.getZForResolution(
+      viewState.resolution,
+      tileSource.zDirection
+    );
+    const tileTexturesByZ = {};
+    const preload = tileLayer.getPreload();
+    if (frameState.nextExtent) {
+      const targetZ = tileGrid.getZForResolution(
+        viewState.nextResolution,
+        tileSource.zDirection
+      );
+      const nextExtent = getRenderExtent(frameState, frameState.nextExtent);
+      this.enqueueTiles(
+        frameState,
+        nextExtent,
+        targetZ,
+        tileTexturesByZ,
+        preload
+      );
+    }
+    this.enqueueTiles(frameState, extent2, z, tileTexturesByZ, 0);
+    if (preload > 0) {
+      setTimeout(() => {
+        this.enqueueTiles(
+          frameState,
+          extent2,
+          z - 1,
+          tileTexturesByZ,
+          preload - 1
+        );
+      }, 0);
+    }
+    const alphaLookup = {};
+    const uid = getUid(this);
+    const time = frameState.time;
+    let blend = false;
+    const tileTextures = tileTexturesByZ[z];
+    for (let i = 0, ii = tileTextures.length; i < ii; ++i) {
+      const tileTexture = tileTextures[i];
+      const tile = tileTexture.tile;
+      if (tile instanceof ReprojTile$1 && tile.getState() === TileState.EMPTY) {
+        continue;
+      }
+      const tileCoord = tile.tileCoord;
+      if (tileTexture.loaded) {
+        const alpha = tile.getAlpha(uid, time);
+        if (alpha === 1) {
+          tile.endTransition(uid);
+          continue;
+        }
+        blend = true;
+        const tileCoordKey = getKey(tileCoord);
+        alphaLookup[tileCoordKey] = alpha;
+      }
+      this.renderComplete = false;
+      const coveredByChildren = this.findAltTiles_(
+        tileGrid,
+        tileCoord,
+        z + 1,
+        tileTexturesByZ
+      );
+      if (coveredByChildren) {
+        continue;
+      }
+      const minZoom = tileGrid.getMinZoom();
+      for (let parentZ = z - 1; parentZ >= minZoom; --parentZ) {
+        const coveredByParent = this.findAltTiles_(
+          tileGrid,
+          tileCoord,
+          parentZ,
+          tileTexturesByZ
+        );
+        if (coveredByParent) {
+          break;
+        }
+      }
+    }
+    this.helper.useProgram(this.program_, frameState);
+    this.helper.prepareDraw(frameState, !blend);
+    const zs = Object.keys(tileTexturesByZ).map(Number).sort(numberSafeCompareFunction);
+    const centerX = viewState.center[0];
+    const centerY = viewState.center[1];
+    for (let j = 0, jj = zs.length; j < jj; ++j) {
+      const tileZ = zs[j];
+      const tileResolution = tileGrid.getResolution(tileZ);
+      const tileSize = toSize(tileGrid.getTileSize(tileZ), this.tempSize_);
+      const tileOrigin = tileGrid.getOrigin(tileZ);
+      const tileWidthWithGutter = tileSize[0] + 2 * gutter;
+      const tileHeightWithGutter = tileSize[1] + 2 * gutter;
+      const aspectRatio = tileWidthWithGutter / tileHeightWithGutter;
+      const centerI = (centerX - tileOrigin[0]) / (tileSize[0] * tileResolution);
+      const centerJ = (tileOrigin[1] - centerY) / (tileSize[1] * tileResolution);
+      const tileScale = viewState.resolution / tileResolution;
+      const depth = depthForZ(tileZ);
+      const tileTextures2 = tileTexturesByZ[tileZ];
+      for (let i = 0, ii = tileTextures2.length; i < ii; ++i) {
+        const tileTexture = tileTextures2[i];
+        if (!tileTexture.loaded) {
+          continue;
+        }
+        const tile = tileTexture.tile;
+        const tileCoord = tile.tileCoord;
+        const tileCoordKey = getKey(tileCoord);
+        const tileCenterI = tileCoord[1];
+        const tileCenterJ = tileCoord[2];
+        reset(this.tileTransform_);
+        scale$3(
+          this.tileTransform_,
+          2 / (frameState.size[0] * tileScale / tileWidthWithGutter),
+          -2 / (frameState.size[1] * tileScale / tileWidthWithGutter)
+        );
+        rotate$2(this.tileTransform_, viewState.rotation);
+        scale$3(this.tileTransform_, 1, 1 / aspectRatio);
+        translate$1(
+          this.tileTransform_,
+          (tileSize[0] * (tileCenterI - centerI) - gutter) / tileWidthWithGutter,
+          (tileSize[1] * (tileCenterJ - centerJ) - gutter) / tileHeightWithGutter
+        );
+        this.helper.setUniformMatrixValue(
+          Uniforms.TILE_TRANSFORM,
+          fromTransform(this.tempMat4_, this.tileTransform_)
+        );
+        this.helper.bindBuffer(tileTexture.coords);
+        this.helper.bindBuffer(this.indices_);
+        this.helper.enableAttributes(attributeDescriptions);
+        let textureSlot = 0;
+        while (textureSlot < tileTexture.textures.length) {
+          const textureProperty = "TEXTURE" + textureSlot;
+          const uniformName = `${Uniforms.TILE_TEXTURE_ARRAY}[${textureSlot}]`;
+          gl.activeTexture(gl[textureProperty]);
+          gl.bindTexture(gl.TEXTURE_2D, tileTexture.textures[textureSlot]);
+          gl.uniform1i(
+            this.helper.getUniformLocation(uniformName),
+            textureSlot
+          );
+          ++textureSlot;
+        }
+        for (let paletteIndex = 0; paletteIndex < this.paletteTextures_.length; ++paletteIndex) {
+          const paletteTexture = this.paletteTextures_[paletteIndex];
+          gl.activeTexture(gl["TEXTURE" + textureSlot]);
+          const texture = paletteTexture.getTexture(gl);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.uniform1i(
+            this.helper.getUniformLocation(paletteTexture.name),
+            textureSlot
+          );
+          ++textureSlot;
+        }
+        const alpha = tileCoordKey in alphaLookup ? alphaLookup[tileCoordKey] : 1;
+        if (alpha < 1) {
+          frameState.animate = true;
+        }
+        this.helper.setUniformFloatValue(Uniforms.TRANSITION_ALPHA, alpha);
+        this.helper.setUniformFloatValue(Uniforms.DEPTH, depth);
+        this.helper.setUniformFloatValue(
+          Uniforms.TEXTURE_PIXEL_WIDTH,
+          tileWidthWithGutter
+        );
+        this.helper.setUniformFloatValue(
+          Uniforms.TEXTURE_PIXEL_HEIGHT,
+          tileHeightWithGutter
+        );
+        this.helper.setUniformFloatValue(
+          Uniforms.TEXTURE_RESOLUTION,
+          tileResolution
+        );
+        this.helper.setUniformFloatValue(
+          Uniforms.TEXTURE_ORIGIN_X,
+          tileOrigin[0] + tileCenterI * tileSize[0] * tileResolution - gutter * tileResolution
+        );
+        this.helper.setUniformFloatValue(
+          Uniforms.TEXTURE_ORIGIN_Y,
+          tileOrigin[1] - tileCenterJ * tileSize[1] * tileResolution + gutter * tileResolution
+        );
+        let gutterExtent = extent2;
+        if (gutter > 0) {
+          gutterExtent = tileGrid.getTileCoordExtent(tileCoord);
+          getIntersection(gutterExtent, extent2, gutterExtent);
+        }
+        this.helper.setUniformFloatVec4(Uniforms.RENDER_EXTENT, gutterExtent);
+        this.helper.setUniformFloatValue(
+          Uniforms.RESOLUTION,
+          viewState.resolution
+        );
+        this.helper.setUniformFloatValue(Uniforms.ZOOM, viewState.zoom);
+        this.helper.drawElements(0, this.indices_.getSize());
+      }
+    }
+    this.helper.finalizeDraw(
+      frameState,
+      this.dispatchPreComposeEvent,
+      this.dispatchPostComposeEvent
+    );
+    const canvas = this.helper.getCanvas();
+    const tileTextureCache = this.tileTextureCache_;
+    while (tileTextureCache.canExpireCache()) {
+      const tileTexture = tileTextureCache.pop();
+      tileTexture.dispose();
+    }
+    const postRenderFunction = function(map2, frameState2) {
+      tileSource.updateCacheSize(0.1, frameState2.viewState.projection);
+      tileSource.expireCache(frameState2.viewState.projection, empty);
+    };
+    frameState.postRenderFunctions.push(postRenderFunction);
+    this.postRender(gl, frameState);
+    return canvas;
+  }
+  getData(pixel) {
+    const gl = this.helper.getGL();
+    if (!gl) {
+      return null;
+    }
+    const frameState = this.frameState_;
+    if (!frameState) {
+      return null;
+    }
+    const layer = this.getLayer();
+    const coordinate = apply(
+      frameState.pixelToCoordinateTransform,
+      pixel.slice()
+    );
+    const viewState = frameState.viewState;
+    const layerExtent = layer.getExtent();
+    if (layerExtent) {
+      if (!containsCoordinate(
+        fromUserExtent(layerExtent, viewState.projection),
+        coordinate
+      )) {
+        return null;
+      }
+    }
+    const sources = layer.getSources(
+      boundingExtent([coordinate]),
+      viewState.resolution
+    );
+    let i, source, tileGrid;
+    for (i = sources.length - 1; i >= 0; --i) {
+      source = sources[i];
+      if (source.getState() === "ready") {
+        tileGrid = source.getTileGridForProjection(viewState.projection);
+        if (source.getWrapX()) {
+          break;
+        }
+        const gridExtent = tileGrid.getExtent();
+        if (!gridExtent || containsCoordinate(gridExtent, coordinate)) {
+          break;
+        }
+      }
+    }
+    if (i < 0) {
+      return null;
+    }
+    const tileTextureCache = this.tileTextureCache_;
+    for (let z = tileGrid.getZForResolution(viewState.resolution); z >= tileGrid.getMinZoom(); --z) {
+      const tileCoord = tileGrid.getTileCoordForCoordAndZ(coordinate, z);
+      const cacheKey = getCacheKey(source, tileCoord);
+      if (!tileTextureCache.containsKey(cacheKey)) {
+        continue;
+      }
+      const tileTexture = tileTextureCache.get(cacheKey);
+      const tile = tileTexture.tile;
+      if (tile instanceof ReprojTile$1 && tile.getState() === TileState.EMPTY) {
+        return null;
+      }
+      if (!tileTexture.loaded) {
+        continue;
+      }
+      const tileOrigin = tileGrid.getOrigin(z);
+      const tileSize = toSize(tileGrid.getTileSize(z));
+      const tileResolution = tileGrid.getResolution(z);
+      const col = (coordinate[0] - tileOrigin[0]) / tileResolution - tileCoord[1] * tileSize[0];
+      const row = (tileOrigin[1] - coordinate[1]) / tileResolution - tileCoord[2] * tileSize[1];
+      return tileTexture.getPixelData(col, row);
+    }
+    return null;
+  }
+  findAltTiles_(tileGrid, tileCoord, altZ, tileTexturesByZ) {
+    const tileRange = tileGrid.getTileRangeForTileCoordAndZ(
+      tileCoord,
+      altZ,
+      this.tempTileRange_
+    );
+    if (!tileRange) {
+      return false;
+    }
+    let covered = true;
+    const tileTextureCache = this.tileTextureCache_;
+    const source = this.getLayer().getRenderSource();
+    for (let x = tileRange.minX; x <= tileRange.maxX; ++x) {
+      for (let y = tileRange.minY; y <= tileRange.maxY; ++y) {
+        const cacheKey = getCacheKey(source, [altZ, x, y]);
+        let loaded = false;
+        if (tileTextureCache.containsKey(cacheKey)) {
+          const tileTexture = tileTextureCache.get(cacheKey);
+          if (tileTexture.loaded) {
+            addTileTextureToLookup(tileTexturesByZ, tileTexture, altZ);
+            loaded = true;
+          }
+        }
+        if (!loaded) {
+          covered = false;
+        }
+      }
+    }
+    return covered;
+  }
+  clearCache() {
+    const tileTextureCache = this.tileTextureCache_;
+    tileTextureCache.forEach((tileTexture) => tileTexture.dispose());
+    tileTextureCache.clear();
+  }
+  removeHelper() {
+    if (this.helper) {
+      this.clearCache();
+    }
+    super.removeHelper();
+  }
+  disposeInternal() {
+    const helper = this.helper;
+    if (helper) {
+      const gl = helper.getGL();
+      gl.deleteProgram(this.program_);
+      delete this.program_;
+      helper.deleteBuffer(this.indices_);
+    }
+    super.disposeInternal();
+    delete this.indices_;
+    delete this.tileTextureCache_;
+    delete this.frameState_;
+  }
+}
+const WebGLTileLayerRenderer$1 = WebGLTileLayerRenderer;
+class PaletteTexture {
+  constructor(name, data) {
+    this.name = name;
+    this.data = data;
+    this.texture_ = null;
+  }
+  getTexture(gl) {
+    if (!this.texture_) {
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        this.data.length / 4,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        this.data
+      );
+      this.texture_ = texture;
+    }
+    return this.texture_;
+  }
+}
+const PaletteTexture$1 = PaletteTexture;
+const ValueTypes = {
+  NUMBER: 1,
+  STRING: 2,
+  COLOR: 4,
+  BOOLEAN: 8,
+  NUMBER_ARRAY: 16,
+  ANY: 31,
+  NONE: 0
+};
+const Operators = {};
+function getValueType(value) {
+  if (typeof value === "number") {
+    return ValueTypes.NUMBER;
+  }
+  if (typeof value === "boolean") {
+    return ValueTypes.BOOLEAN;
+  }
+  if (typeof value === "string") {
+    if (isStringColor(value)) {
+      return ValueTypes.COLOR | ValueTypes.STRING;
+    }
+    return ValueTypes.STRING;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`Unhandled value type: ${JSON.stringify(value)}`);
+  }
+  const valueArr = value;
+  const onlyNumbers = valueArr.every(function(v) {
+    return typeof v === "number";
+  });
+  if (onlyNumbers) {
+    if (valueArr.length === 3 || valueArr.length === 4) {
+      return ValueTypes.COLOR | ValueTypes.NUMBER_ARRAY;
+    }
+    return ValueTypes.NUMBER_ARRAY;
+  }
+  if (typeof valueArr[0] !== "string") {
+    throw new Error(
+      `Expected an expression operator but received: ${JSON.stringify(
+        valueArr
+      )}`
+    );
+  }
+  const operator = Operators[valueArr[0]];
+  if (operator === void 0) {
+    throw new Error(
+      `Unrecognized expression operator: ${JSON.stringify(valueArr)}`
+    );
+  }
+  return operator.getReturnType(valueArr.slice(1));
+}
+function isTypeUnique(valueType) {
+  return Math.log2(valueType) % 1 === 0;
+}
+function numberToGlsl(v) {
+  const s = v.toString();
+  return s.includes(".") ? s : s + ".0";
+}
+function arrayToGlsl(array) {
+  if (array.length < 2 || array.length > 4) {
+    throw new Error(
+      "`formatArray` can only output `vec2`, `vec3` or `vec4` arrays."
+    );
+  }
+  return `vec${array.length}(${array.map(numberToGlsl).join(", ")})`;
+}
+function colorToGlsl(color) {
+  const array = asArray(color).slice();
+  if (array.length < 4) {
+    array.push(1);
+  }
+  return arrayToGlsl(
+    array.map(function(c, i) {
+      return i < 3 ? c / 255 : c;
+    })
+  );
+}
+function getStringNumberEquivalent(context2, string) {
+  if (context2.stringLiteralsMap[string] === void 0) {
+    context2.stringLiteralsMap[string] = Object.keys(
+      context2.stringLiteralsMap
+    ).length;
+  }
+  return context2.stringLiteralsMap[string];
+}
+function stringToGlsl(context2, string) {
+  return numberToGlsl(getStringNumberEquivalent(context2, string));
+}
+function expressionToGlsl(context2, value, typeHint) {
+  if (Array.isArray(value) && typeof value[0] === "string") {
+    const operator = Operators[value[0]];
+    if (operator === void 0) {
+      throw new Error(
+        `Unrecognized expression operator: ${JSON.stringify(value)}`
+      );
+    }
+    return operator.toGlsl(context2, value.slice(1), typeHint);
+  }
+  const valueType = getValueType(value);
+  if ((valueType & ValueTypes.NUMBER) > 0) {
+    return numberToGlsl(value);
+  }
+  if ((valueType & ValueTypes.BOOLEAN) > 0) {
+    return value.toString();
+  }
+  if ((valueType & ValueTypes.STRING) > 0 && (typeHint === void 0 || typeHint == ValueTypes.STRING)) {
+    return stringToGlsl(context2, value.toString());
+  }
+  if ((valueType & ValueTypes.COLOR) > 0 && (typeHint === void 0 || typeHint == ValueTypes.COLOR)) {
+    return colorToGlsl(value);
+  }
+  if ((valueType & ValueTypes.NUMBER_ARRAY) > 0) {
+    return arrayToGlsl(value);
+  }
+  throw new Error(`Unexpected expression ${value} (expected type ${typeHint})`);
+}
+function assertNumber(value) {
+  if (!(getValueType(value) & ValueTypes.NUMBER)) {
+    throw new Error(
+      `A numeric value was expected, got ${JSON.stringify(value)} instead`
+    );
+  }
+}
+function assertNumbers(values) {
+  for (let i = 0; i < values.length; i++) {
+    assertNumber(values[i]);
+  }
+}
+function assertString(value) {
+  if (!(getValueType(value) & ValueTypes.STRING)) {
+    throw new Error(
+      `A string value was expected, got ${JSON.stringify(value)} instead`
+    );
+  }
+}
+function assertBoolean(value) {
+  if (!(getValueType(value) & ValueTypes.BOOLEAN)) {
+    throw new Error(
+      `A boolean value was expected, got ${JSON.stringify(value)} instead`
+    );
+  }
+}
+function assertArgsCount(args, count) {
+  if (args.length !== count) {
+    throw new Error(
+      `Exactly ${count} arguments were expected, got ${args.length} instead`
+    );
+  }
+}
+function assertArgsMinCount(args, count) {
+  if (args.length < count) {
+    throw new Error(
+      `At least ${count} arguments were expected, got ${args.length} instead`
+    );
+  }
+}
+function assertArgsMaxCount(args, count) {
+  if (args.length > count) {
+    throw new Error(
+      `At most ${count} arguments were expected, got ${args.length} instead`
+    );
+  }
+}
+function assertArgsEven(args) {
+  if (args.length % 2 !== 0) {
+    throw new Error(
+      `An even amount of arguments was expected, got ${args} instead`
+    );
+  }
+}
+function assertArgsOdd(args) {
+  if (args.length % 2 === 0) {
+    throw new Error(
+      `An odd amount of arguments was expected, got ${args} instead`
+    );
+  }
+}
+function assertUniqueInferredType(args, types) {
+  if (!isTypeUnique(types)) {
+    throw new Error(
+      `Could not infer only one type from the following expression: ${JSON.stringify(
+        args
+      )}`
+    );
+  }
+}
+Operators["get"] = {
+  getReturnType: function(args) {
+    return ValueTypes.ANY;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertString(args[0]);
+    const value = args[0].toString();
+    if (!context2.attributes.includes(value)) {
+      context2.attributes.push(value);
+    }
+    const prefix = context2.inFragmentShader ? "v_" : "a_";
+    return prefix + value;
+  }
+};
+function uniformNameForVariable(variableName) {
+  return "u_var_" + variableName;
+}
+Operators["var"] = {
+  getReturnType: function(args) {
+    return ValueTypes.ANY;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertString(args[0]);
+    const value = args[0].toString();
+    if (!context2.variables.includes(value)) {
+      context2.variables.push(value);
+    }
+    return uniformNameForVariable(value);
+  }
+};
+const PALETTE_TEXTURE_ARRAY = "u_paletteTextures";
+Operators["palette"] = {
+  getReturnType: function(args) {
+    return ValueTypes.COLOR;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumber(args[0]);
+    const index = expressionToGlsl(context2, args[0]);
+    const colors = args[1];
+    if (!Array.isArray(colors)) {
+      throw new Error("The second argument of palette must be an array");
+    }
+    const numColors = colors.length;
+    const palette = new Uint8Array(numColors * 4);
+    for (let i = 0; i < numColors; i++) {
+      const candidate = colors[i];
+      let color;
+      if (typeof candidate === "string") {
+        color = fromString(candidate);
+      } else {
+        if (!Array.isArray(candidate)) {
+          throw new Error(
+            "The second argument of palette must be an array of strings or colors"
+          );
+        }
+        const length = candidate.length;
+        if (length === 4) {
+          color = candidate;
+        } else {
+          if (length !== 3) {
+            throw new Error(
+              `Expected palette color to have 3 or 4 values, got ${length}`
+            );
+          }
+          color = [candidate[0], candidate[1], candidate[2], 1];
+        }
+      }
+      const offset = i * 4;
+      palette[offset] = color[0];
+      palette[offset + 1] = color[1];
+      palette[offset + 2] = color[2];
+      palette[offset + 3] = color[3] * 255;
+    }
+    if (!context2.paletteTextures) {
+      context2.paletteTextures = [];
+    }
+    const paletteName = `${PALETTE_TEXTURE_ARRAY}[${context2.paletteTextures.length}]`;
+    const paletteTexture = new PaletteTexture$1(paletteName, palette);
+    context2.paletteTextures.push(paletteTexture);
+    return `texture2D(${paletteName}, vec2((${index} + 0.5) / ${numColors}.0, 0.5))`;
+  }
+};
+const GET_BAND_VALUE_FUNC = "getBandValue";
+Operators["band"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsMinCount(args, 1);
+    assertArgsMaxCount(args, 3);
+    const band = args[0];
+    if (!(GET_BAND_VALUE_FUNC in context2.functions)) {
+      let ifBlocks = "";
+      const bandCount = context2.bandCount || 1;
+      for (let i = 0; i < bandCount; i++) {
+        const colorIndex = Math.floor(i / 4);
+        let bandIndex = i % 4;
+        if (i === bandCount - 1 && bandIndex === 1) {
+          bandIndex = 3;
+        }
+        const textureName = `${Uniforms.TILE_TEXTURE_ARRAY}[${colorIndex}]`;
+        ifBlocks += `
+          if (band == ${i + 1}.0) {
+            return texture2D(${textureName}, v_textureCoord + vec2(dx, dy))[${bandIndex}];
+          }
+        `;
+      }
+      context2.functions[GET_BAND_VALUE_FUNC] = `
+        float getBandValue(float band, float xOffset, float yOffset) {
+          float dx = xOffset / ${Uniforms.TEXTURE_PIXEL_WIDTH};
+          float dy = yOffset / ${Uniforms.TEXTURE_PIXEL_HEIGHT};
+          ${ifBlocks}
+        }
+      `;
+    }
+    const bandExpression = expressionToGlsl(context2, band);
+    const xOffsetExpression = expressionToGlsl(context2, args[1] || 0);
+    const yOffsetExpression = expressionToGlsl(context2, args[2] || 0);
+    return `${GET_BAND_VALUE_FUNC}(${bandExpression}, ${xOffsetExpression}, ${yOffsetExpression})`;
+  }
+};
+Operators["time"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 0);
+    return "u_time";
+  }
+};
+Operators["zoom"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 0);
+    return "u_zoom";
+  }
+};
+Operators["resolution"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 0);
+    return "u_resolution";
+  }
+};
+Operators["*"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} * ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["/"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} / ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["+"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} + ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["-"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} - ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["clamp"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 3);
+    assertNumbers(args);
+    const min = expressionToGlsl(context2, args[1]);
+    const max = expressionToGlsl(context2, args[2]);
+    return `clamp(${expressionToGlsl(context2, args[0])}, ${min}, ${max})`;
+  }
+};
+Operators["%"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `mod(${expressionToGlsl(context2, args[0])}, ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["^"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `pow(${expressionToGlsl(context2, args[0])}, ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["abs"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `abs(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators["floor"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `floor(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators["round"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `floor(${expressionToGlsl(context2, args[0])} + 0.5)`;
+  }
+};
+Operators["ceil"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `ceil(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators["sin"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `sin(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators["cos"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertNumbers(args);
+    return `cos(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators["atan"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsMinCount(args, 1);
+    assertArgsMaxCount(args, 2);
+    assertNumbers(args);
+    return args.length === 2 ? `atan(${expressionToGlsl(context2, args[0])}, ${expressionToGlsl(
+      context2,
+      args[1]
+    )})` : `atan(${expressionToGlsl(context2, args[0])})`;
+  }
+};
+Operators[">"] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} > ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators[">="] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} >= ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["<"] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} < ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+Operators["<="] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 2);
+    assertNumbers(args);
+    return `(${expressionToGlsl(context2, args[0])} <= ${expressionToGlsl(
+      context2,
+      args[1]
+    )})`;
+  }
+};
+function getEqualOperator(operator) {
+  return {
+    getReturnType: function(args) {
+      return ValueTypes.BOOLEAN;
+    },
+    toGlsl: function(context2, args) {
+      assertArgsCount(args, 2);
+      let type = ValueTypes.ANY;
+      for (let i = 0; i < args.length; i++) {
+        type &= getValueType(args[i]);
+      }
+      if (type === ValueTypes.NONE) {
+        throw new Error(
+          `All arguments should be of compatible type, got ${JSON.stringify(
+            args
+          )} instead`
+        );
+      }
+      type &= ~ValueTypes.COLOR;
+      return `(${expressionToGlsl(
+        context2,
+        args[0],
+        type
+      )} ${operator} ${expressionToGlsl(context2, args[1], type)})`;
+    }
+  };
+}
+Operators["=="] = getEqualOperator("==");
+Operators["!="] = getEqualOperator("!=");
+Operators["!"] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 1);
+    assertBoolean(args[0]);
+    return `(!${expressionToGlsl(context2, args[0])})`;
+  }
+};
+function getDecisionOperator(operator) {
+  return {
+    getReturnType: function(args) {
+      return ValueTypes.BOOLEAN;
+    },
+    toGlsl: function(context2, args) {
+      assertArgsMinCount(args, 2);
+      for (let i = 0; i < args.length; i++) {
+        assertBoolean(args[i]);
+      }
+      let result = "";
+      result = args.map((arg) => expressionToGlsl(context2, arg)).join(` ${operator} `);
+      result = `(${result})`;
+      return result;
+    }
+  };
+}
+Operators["all"] = getDecisionOperator("&&");
+Operators["any"] = getDecisionOperator("||");
+Operators["between"] = {
+  getReturnType: function(args) {
+    return ValueTypes.BOOLEAN;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsCount(args, 3);
+    assertNumbers(args);
+    const min = expressionToGlsl(context2, args[1]);
+    const max = expressionToGlsl(context2, args[2]);
+    const value = expressionToGlsl(context2, args[0]);
+    return `(${value} >= ${min} && ${value} <= ${max})`;
+  }
+};
+Operators["array"] = {
+  getReturnType: function(args) {
+    return ValueTypes.NUMBER_ARRAY;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsMinCount(args, 2);
+    assertArgsMaxCount(args, 4);
+    assertNumbers(args);
+    const parsedArgs = args.map(function(val) {
+      return expressionToGlsl(context2, val, ValueTypes.NUMBER);
+    });
+    return `vec${args.length}(${parsedArgs.join(", ")})`;
+  }
+};
+Operators["color"] = {
+  getReturnType: function(args) {
+    return ValueTypes.COLOR;
+  },
+  toGlsl: function(context2, args) {
+    assertArgsMinCount(args, 3);
+    assertArgsMaxCount(args, 4);
+    assertNumbers(args);
+    const array = args;
+    if (args.length === 3) {
+      array.push(1);
+    }
+    const parsedArgs = args.map(function(val, i) {
+      return expressionToGlsl(context2, val, ValueTypes.NUMBER) + (i < 3 ? " / 255.0" : "");
+    });
+    return `vec${args.length}(${parsedArgs.join(", ")})`;
+  }
+};
+Operators["interpolate"] = {
+  getReturnType: function(args) {
+    let type = ValueTypes.COLOR | ValueTypes.NUMBER;
+    for (let i = 3; i < args.length; i += 2) {
+      type = type & getValueType(args[i]);
+    }
+    return type;
+  },
+  toGlsl: function(context2, args, typeHint) {
+    assertArgsEven(args);
+    assertArgsMinCount(args, 6);
+    const type = args[0];
+    let interpolation;
+    switch (type[0]) {
+      case "linear":
+        interpolation = 1;
+        break;
+      case "exponential":
+        interpolation = type[1];
+        break;
+      default:
+        interpolation = null;
+    }
+    if (!interpolation) {
+      throw new Error(
+        `Invalid interpolation type for "interpolate" operator, received: ${JSON.stringify(
+          type
+        )}`
+      );
+    }
+    typeHint = typeHint !== void 0 ? typeHint : ValueTypes.ANY;
+    const outputType = Operators["interpolate"].getReturnType(args) & typeHint;
+    assertUniqueInferredType(args, outputType);
+    const input = expressionToGlsl(context2, args[1]);
+    const exponent = numberToGlsl(interpolation);
+    let result = "";
+    for (let i = 2; i < args.length - 2; i += 2) {
+      const stop1 = expressionToGlsl(context2, args[i]);
+      const output1 = result || expressionToGlsl(context2, args[i + 1], outputType);
+      const stop2 = expressionToGlsl(context2, args[i + 2]);
+      const output2 = expressionToGlsl(context2, args[i + 3], outputType);
+      result = `mix(${output1}, ${output2}, pow(clamp((${input} - ${stop1}) / (${stop2} - ${stop1}), 0.0, 1.0), ${exponent}))`;
+    }
+    return result;
+  }
+};
+Operators["match"] = {
+  getReturnType: function(args) {
+    let type = ValueTypes.ANY;
+    for (let i = 2; i < args.length; i += 2) {
+      type = type & getValueType(args[i]);
+    }
+    type = type & getValueType(args[args.length - 1]);
+    return type;
+  },
+  toGlsl: function(context2, args, typeHint) {
+    assertArgsEven(args);
+    assertArgsMinCount(args, 4);
+    typeHint = typeHint !== void 0 ? typeHint : ValueTypes.ANY;
+    const outputType = Operators["match"].getReturnType(args) & typeHint;
+    assertUniqueInferredType(args, outputType);
+    const input = expressionToGlsl(context2, args[0]);
+    const fallback = expressionToGlsl(
+      context2,
+      args[args.length - 1],
+      outputType
+    );
+    let result = null;
+    for (let i = args.length - 3; i >= 1; i -= 2) {
+      const match = expressionToGlsl(context2, args[i]);
+      const output = expressionToGlsl(context2, args[i + 1], outputType);
+      result = `(${input} == ${match} ? ${output} : ${result || fallback})`;
+    }
+    return result;
+  }
+};
+Operators["case"] = {
+  getReturnType: function(args) {
+    let type = ValueTypes.ANY;
+    for (let i = 1; i < args.length; i += 2) {
+      type = type & getValueType(args[i]);
+    }
+    type = type & getValueType(args[args.length - 1]);
+    return type;
+  },
+  toGlsl: function(context2, args, typeHint) {
+    assertArgsOdd(args);
+    assertArgsMinCount(args, 3);
+    typeHint = typeHint !== void 0 ? typeHint : ValueTypes.ANY;
+    const outputType = Operators["case"].getReturnType(args) & typeHint;
+    assertUniqueInferredType(args, outputType);
+    for (let i = 0; i < args.length - 1; i += 2) {
+      assertBoolean(args[i]);
+    }
+    const fallback = expressionToGlsl(
+      context2,
+      args[args.length - 1],
+      outputType
+    );
+    let result = null;
+    for (let i = args.length - 3; i >= 0; i -= 2) {
+      const condition = expressionToGlsl(context2, args[i]);
+      const output = expressionToGlsl(context2, args[i + 1], outputType);
+      result = `(${condition} ? ${output} : ${result || fallback})`;
+    }
+    return result;
+  }
+};
+function parseStyle(style2, bandCount) {
+  const vertexShader = `
+    attribute vec2 ${Attributes.TEXTURE_COORD};
+    uniform mat4 ${Uniforms.TILE_TRANSFORM};
+    uniform float ${Uniforms.TEXTURE_PIXEL_WIDTH};
+    uniform float ${Uniforms.TEXTURE_PIXEL_HEIGHT};
+    uniform float ${Uniforms.TEXTURE_RESOLUTION};
+    uniform float ${Uniforms.TEXTURE_ORIGIN_X};
+    uniform float ${Uniforms.TEXTURE_ORIGIN_Y};
+    uniform float ${Uniforms.DEPTH};
+
+    varying vec2 v_textureCoord;
+    varying vec2 v_mapCoord;
+
+    void main() {
+      v_textureCoord = ${Attributes.TEXTURE_COORD};
+      v_mapCoord = vec2(
+        ${Uniforms.TEXTURE_ORIGIN_X} + ${Uniforms.TEXTURE_RESOLUTION} * ${Uniforms.TEXTURE_PIXEL_WIDTH} * v_textureCoord[0],
+        ${Uniforms.TEXTURE_ORIGIN_Y} - ${Uniforms.TEXTURE_RESOLUTION} * ${Uniforms.TEXTURE_PIXEL_HEIGHT} * v_textureCoord[1]
+      );
+      gl_Position = ${Uniforms.TILE_TRANSFORM} * vec4(${Attributes.TEXTURE_COORD}, ${Uniforms.DEPTH}, 1.0);
+    }
+  `;
+  const context2 = {
+    inFragmentShader: true,
+    variables: [],
+    attributes: [],
+    stringLiteralsMap: {},
+    functions: {},
+    bandCount
+  };
+  const pipeline = [];
+  if (style2.color !== void 0) {
+    const color = expressionToGlsl(context2, style2.color, ValueTypes.COLOR);
+    pipeline.push(`color = ${color};`);
+  }
+  if (style2.contrast !== void 0) {
+    const contrast = expressionToGlsl(
+      context2,
+      style2.contrast,
+      ValueTypes.NUMBER
+    );
+    pipeline.push(
+      `color.rgb = clamp((${contrast} + 1.0) * color.rgb - (${contrast} / 2.0), vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));`
+    );
+  }
+  if (style2.exposure !== void 0) {
+    const exposure = expressionToGlsl(
+      context2,
+      style2.exposure,
+      ValueTypes.NUMBER
+    );
+    pipeline.push(
+      `color.rgb = clamp((${exposure} + 1.0) * color.rgb, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));`
+    );
+  }
+  if (style2.saturation !== void 0) {
+    const saturation = expressionToGlsl(
+      context2,
+      style2.saturation,
+      ValueTypes.NUMBER
+    );
+    pipeline.push(`
+      float saturation = ${saturation} + 1.0;
+      float sr = (1.0 - saturation) * 0.2126;
+      float sg = (1.0 - saturation) * 0.7152;
+      float sb = (1.0 - saturation) * 0.0722;
+      mat3 saturationMatrix = mat3(
+        sr + saturation, sr, sr,
+        sg, sg + saturation, sg,
+        sb, sb, sb + saturation
+      );
+      color.rgb = clamp(saturationMatrix * color.rgb, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));
+    `);
+  }
+  if (style2.gamma !== void 0) {
+    const gamma = expressionToGlsl(context2, style2.gamma, ValueTypes.NUMBER);
+    pipeline.push(`color.rgb = pow(color.rgb, vec3(1.0 / ${gamma}));`);
+  }
+  if (style2.brightness !== void 0) {
+    const brightness = expressionToGlsl(
+      context2,
+      style2.brightness,
+      ValueTypes.NUMBER
+    );
+    pipeline.push(
+      `color.rgb = clamp(color.rgb + ${brightness}, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));`
+    );
+  }
+  const uniforms = {};
+  const numVariables = context2.variables.length;
+  if (numVariables > 1 && !style2.variables) {
+    throw new Error(
+      `Missing variables in style (expected ${context2.variables})`
+    );
+  }
+  for (let i = 0; i < numVariables; ++i) {
+    const variableName = context2.variables[i];
+    if (!(variableName in style2.variables)) {
+      throw new Error(`Missing '${variableName}' in style variables`);
+    }
+    const uniformName = uniformNameForVariable(variableName);
+    uniforms[uniformName] = function() {
+      let value = style2.variables[variableName];
+      if (typeof value === "string") {
+        value = getStringNumberEquivalent(context2, value);
+      }
+      return value !== void 0 ? value : -9999999;
+    };
+  }
+  const uniformDeclarations = Object.keys(uniforms).map(function(name) {
+    return `uniform float ${name};`;
+  });
+  const textureCount = Math.ceil(bandCount / 4);
+  uniformDeclarations.push(
+    `uniform sampler2D ${Uniforms.TILE_TEXTURE_ARRAY}[${textureCount}];`
+  );
+  if (context2.paletteTextures) {
+    uniformDeclarations.push(
+      `uniform sampler2D ${PALETTE_TEXTURE_ARRAY}[${context2.paletteTextures.length}];`
+    );
+  }
+  const functionDefintions = Object.keys(context2.functions).map(function(name) {
+    return context2.functions[name];
+  });
+  const fragmentShader = `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+    #else
+    precision mediump float;
+    #endif
+
+    varying vec2 v_textureCoord;
+    varying vec2 v_mapCoord;
+    uniform vec4 ${Uniforms.RENDER_EXTENT};
+    uniform float ${Uniforms.TRANSITION_ALPHA};
+    uniform float ${Uniforms.TEXTURE_PIXEL_WIDTH};
+    uniform float ${Uniforms.TEXTURE_PIXEL_HEIGHT};
+    uniform float ${Uniforms.RESOLUTION};
+    uniform float ${Uniforms.ZOOM};
+
+    ${uniformDeclarations.join("\n")}
+
+    ${functionDefintions.join("\n")}
+
+    void main() {
+      if (
+        v_mapCoord[0] < ${Uniforms.RENDER_EXTENT}[0] ||
+        v_mapCoord[1] < ${Uniforms.RENDER_EXTENT}[1] ||
+        v_mapCoord[0] > ${Uniforms.RENDER_EXTENT}[2] ||
+        v_mapCoord[1] > ${Uniforms.RENDER_EXTENT}[3]
+      ) {
+        discard;
+      }
+
+      vec4 color = texture2D(${Uniforms.TILE_TEXTURE_ARRAY}[0],  v_textureCoord);
+
+      ${pipeline.join("\n")}
+
+      if (color.a == 0.0) {
+        discard;
+      }
+
+      gl_FragColor = color;
+      gl_FragColor.rgb *= gl_FragColor.a;
+      gl_FragColor *= ${Uniforms.TRANSITION_ALPHA};
+    }`;
+  return {
+    vertexShader,
+    fragmentShader,
+    uniforms,
+    paletteTextures: context2.paletteTextures
+  };
+}
+class WebGLTileLayer extends BaseTileLayer$1 {
+  constructor(options) {
+    options = options ? Object.assign({}, options) : {};
+    const style2 = options.style || {};
+    delete options.style;
+    const cacheSize = options.cacheSize;
+    delete options.cacheSize;
+    super(options);
+    this.sources_ = options.sources;
+    this.renderedSource_ = null;
+    this.renderedResolution_ = NaN;
+    this.style_ = style2;
+    this.cacheSize_ = cacheSize;
+    this.styleVariables_ = this.style_.variables || {};
+    this.addChangeListener(LayerProperty.SOURCE, this.handleSourceUpdate_);
+  }
+  getSources(extent2, resolution) {
+    const source = this.getSource();
+    return this.sources_ ? typeof this.sources_ === "function" ? this.sources_(extent2, resolution) : this.sources_ : source ? [source] : [];
+  }
+  getRenderSource() {
+    return this.renderedSource_ || this.getSource();
+  }
+  getSourceState() {
+    const source = this.getRenderSource();
+    return source ? source.getState() : "undefined";
+  }
+  handleSourceUpdate_() {
+    if (this.hasRenderer()) {
+      this.getRenderer().clearCache();
+    }
+    if (this.getSource()) {
+      this.setStyle(this.style_);
+    }
+  }
+  getSourceBandCount_() {
+    const max = Number.MAX_SAFE_INTEGER;
+    const sources = this.getSources([-max, -max, max, max], max);
+    return sources && sources.length && "bandCount" in sources[0] ? sources[0].bandCount : 4;
+  }
+  createRenderer() {
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
+    return new WebGLTileLayerRenderer$1(this, {
+      vertexShader: parsedStyle.vertexShader,
+      fragmentShader: parsedStyle.fragmentShader,
+      uniforms: parsedStyle.uniforms,
+      cacheSize: this.cacheSize_,
+      paletteTextures: parsedStyle.paletteTextures
+    });
+  }
+  renderSources(frameState, sources) {
+    const layerRenderer = this.getRenderer();
+    let canvas;
+    for (let i = 0, ii = sources.length; i < ii; ++i) {
+      this.renderedSource_ = sources[i];
+      if (layerRenderer.prepareFrame(frameState)) {
+        canvas = layerRenderer.renderFrame(frameState);
+      }
+    }
+    return canvas;
+  }
+  render(frameState, target) {
+    this.rendered = true;
+    const viewState = frameState.viewState;
+    const sources = this.getSources(frameState.extent, viewState.resolution);
+    let ready = true;
+    for (let i = 0, ii = sources.length; i < ii; ++i) {
+      const source = sources[i];
+      const sourceState = source.getState();
+      if (sourceState == "loading") {
+        const onChange = () => {
+          if (source.getState() == "ready") {
+            source.removeEventListener("change", onChange);
+            this.changed();
+          }
+        };
+        source.addEventListener("change", onChange);
+      }
+      ready = ready && sourceState == "ready";
+    }
+    const canvas = this.renderSources(frameState, sources);
+    if (this.getRenderer().renderComplete && ready) {
+      this.renderedResolution_ = viewState.resolution;
+      return canvas;
+    }
+    if (this.renderedResolution_ > 0.5 * viewState.resolution) {
+      const altSources = this.getSources(
+        frameState.extent,
+        this.renderedResolution_
+      ).filter((source) => !sources.includes(source));
+      if (altSources.length > 0) {
+        return this.renderSources(frameState, altSources);
+      }
+    }
+    return canvas;
+  }
+  setStyle(style2) {
+    this.styleVariables_ = style2.variables || {};
+    this.style_ = style2;
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
+    const renderer = this.getRenderer();
+    renderer.reset({
+      vertexShader: parsedStyle.vertexShader,
+      fragmentShader: parsedStyle.fragmentShader,
+      uniforms: parsedStyle.uniforms,
+      paletteTextures: parsedStyle.paletteTextures
+    });
+    this.changed();
+  }
+  updateStyleVariables(variables) {
+    Object.assign(this.styleVariables_, variables);
+    this.changed();
+  }
+}
+WebGLTileLayer.prototype.dispose;
+const TileLayer$2 = WebGLTileLayer;
 const tmpTileCoord = [0, 0, 0];
 const DECIMALS = 5;
 class TileGrid {
@@ -9906,152 +12410,6 @@ class TileGrid {
   }
 }
 const TileGrid$1 = TileGrid;
-class LRUCache {
-  constructor(highWaterMark) {
-    this.highWaterMark = highWaterMark !== void 0 ? highWaterMark : 2048;
-    this.count_ = 0;
-    this.entries_ = {};
-    this.oldest_ = null;
-    this.newest_ = null;
-  }
-  canExpireCache() {
-    return this.highWaterMark > 0 && this.getCount() > this.highWaterMark;
-  }
-  expireCache(keep) {
-    while (this.canExpireCache()) {
-      this.pop();
-    }
-  }
-  clear() {
-    this.count_ = 0;
-    this.entries_ = {};
-    this.oldest_ = null;
-    this.newest_ = null;
-  }
-  containsKey(key) {
-    return this.entries_.hasOwnProperty(key);
-  }
-  forEach(f) {
-    let entry = this.oldest_;
-    while (entry) {
-      f(entry.value_, entry.key_, this);
-      entry = entry.newer;
-    }
-  }
-  get(key, options) {
-    const entry = this.entries_[key];
-    assert(entry !== void 0, 15);
-    if (entry === this.newest_) {
-      return entry.value_;
-    } else if (entry === this.oldest_) {
-      this.oldest_ = this.oldest_.newer;
-      this.oldest_.older = null;
-    } else {
-      entry.newer.older = entry.older;
-      entry.older.newer = entry.newer;
-    }
-    entry.newer = null;
-    entry.older = this.newest_;
-    this.newest_.newer = entry;
-    this.newest_ = entry;
-    return entry.value_;
-  }
-  remove(key) {
-    const entry = this.entries_[key];
-    assert(entry !== void 0, 15);
-    if (entry === this.newest_) {
-      this.newest_ = entry.older;
-      if (this.newest_) {
-        this.newest_.newer = null;
-      }
-    } else if (entry === this.oldest_) {
-      this.oldest_ = entry.newer;
-      if (this.oldest_) {
-        this.oldest_.older = null;
-      }
-    } else {
-      entry.newer.older = entry.older;
-      entry.older.newer = entry.newer;
-    }
-    delete this.entries_[key];
-    --this.count_;
-    return entry.value_;
-  }
-  getCount() {
-    return this.count_;
-  }
-  getKeys() {
-    const keys = new Array(this.count_);
-    let i = 0;
-    let entry;
-    for (entry = this.newest_; entry; entry = entry.older) {
-      keys[i++] = entry.key_;
-    }
-    return keys;
-  }
-  getValues() {
-    const values = new Array(this.count_);
-    let i = 0;
-    let entry;
-    for (entry = this.newest_; entry; entry = entry.older) {
-      values[i++] = entry.value_;
-    }
-    return values;
-  }
-  peekLast() {
-    return this.oldest_.value_;
-  }
-  peekLastKey() {
-    return this.oldest_.key_;
-  }
-  peekFirstKey() {
-    return this.newest_.key_;
-  }
-  peek(key) {
-    if (!this.containsKey(key)) {
-      return void 0;
-    }
-    return this.entries_[key].value_;
-  }
-  pop() {
-    const entry = this.oldest_;
-    delete this.entries_[entry.key_];
-    if (entry.newer) {
-      entry.newer.older = null;
-    }
-    this.oldest_ = entry.newer;
-    if (!this.oldest_) {
-      this.newest_ = null;
-    }
-    --this.count_;
-    return entry.value_;
-  }
-  replace(key, value) {
-    this.get(key);
-    this.entries_[key].value_ = value;
-  }
-  set(key, value) {
-    assert(!(key in this.entries_), 16);
-    const entry = {
-      key_: key,
-      newer: null,
-      older: this.newest_,
-      value_: value
-    };
-    if (!this.newest_) {
-      this.oldest_ = entry;
-    } else {
-      this.newest_.newer = entry;
-    }
-    this.newest_ = entry;
-    this.entries_[key] = entry;
-    ++this.count_;
-  }
-  setSize(size) {
-    this.highWaterMark = size;
-  }
-}
-const LRUCache$1 = LRUCache;
 class TileCache extends LRUCache$1 {
   clear() {
     while (this.getCount() > 0) {
@@ -10774,10 +13132,10 @@ class CustomTile extends ImageTile$1 {
         this.zoomifyImage_ = image;
         return image;
       } else {
-        const context = createCanvasContext2D(tileSize[0], tileSize[1]);
-        context.drawImage(image, 0, 0);
-        this.zoomifyImage_ = context.canvas;
-        return context.canvas;
+        const context2 = createCanvasContext2D(tileSize[0], tileSize[1]);
+        context2.drawImage(image, 0, 0);
+        this.zoomifyImage_ = context2.canvas;
+        return context2.canvas;
       }
     } else {
       return image;
@@ -10903,6 +13261,1587 @@ class Zoomify extends TileImage$1 {
   }
 }
 const Zoomify$1 = Zoomify;
+class ImageCanvas extends ImageBase$1 {
+  constructor(extent2, resolution, pixelRatio, canvas, loader) {
+    const state = loader !== void 0 ? ImageState.IDLE : ImageState.LOADED;
+    super(extent2, resolution, pixelRatio, state);
+    this.loader_ = loader !== void 0 ? loader : null;
+    this.canvas_ = canvas;
+    this.error_ = null;
+  }
+  getError() {
+    return this.error_;
+  }
+  handleLoad_(err) {
+    if (err) {
+      this.error_ = err;
+      this.state = ImageState.ERROR;
+    } else {
+      this.state = ImageState.LOADED;
+    }
+    this.changed();
+  }
+  load() {
+    if (this.state == ImageState.IDLE) {
+      this.state = ImageState.LOADING;
+      this.changed();
+      this.loader_(this.handleLoad_.bind(this));
+    }
+  }
+  getImage() {
+    return this.canvas_;
+  }
+}
+const ImageCanvas$1 = ImageCanvas;
+class BaseImageLayer extends Layer$1 {
+  constructor(options) {
+    options = options ? options : {};
+    super(options);
+  }
+}
+const BaseImageLayer$1 = BaseImageLayer;
+let pixelContext = null;
+function createPixelContext() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  pixelContext = canvas.getContext("2d");
+}
+class CanvasLayerRenderer extends LayerRenderer$1 {
+  constructor(layer) {
+    super(layer);
+    this.container = null;
+    this.renderedResolution;
+    this.tempTransform = create$1();
+    this.pixelTransform = create$1();
+    this.inversePixelTransform = create$1();
+    this.context = null;
+    this.containerReused = false;
+    this.pixelContext_ = null;
+    this.frameState = null;
+  }
+  getImageData(image, col, row) {
+    if (!pixelContext) {
+      createPixelContext();
+    }
+    pixelContext.clearRect(0, 0, 1, 1);
+    let data;
+    try {
+      pixelContext.drawImage(image, col, row, 1, 1, 0, 0, 1, 1);
+      data = pixelContext.getImageData(0, 0, 1, 1).data;
+    } catch (err) {
+      pixelContext = null;
+      return null;
+    }
+    return data;
+  }
+  getBackground(frameState) {
+    const layer = this.getLayer();
+    let background = layer.getBackground();
+    if (typeof background === "function") {
+      background = background(frameState.viewState.resolution);
+    }
+    return background || void 0;
+  }
+  useContainer(target, transform2, backgroundColor) {
+    const layerClassName = this.getLayer().getClassName();
+    let container, context2;
+    if (target && target.className === layerClassName && (!backgroundColor || target && target.style.backgroundColor && equals$2(
+      asArray(target.style.backgroundColor),
+      asArray(backgroundColor)
+    ))) {
+      const canvas = target.firstElementChild;
+      if (canvas instanceof HTMLCanvasElement) {
+        context2 = canvas.getContext("2d");
+      }
+    }
+    if (context2 && context2.canvas.style.transform === transform2) {
+      this.container = target;
+      this.context = context2;
+      this.containerReused = true;
+    } else if (this.containerReused) {
+      this.container = null;
+      this.context = null;
+      this.containerReused = false;
+    }
+    if (!this.container) {
+      container = document.createElement("div");
+      container.className = layerClassName;
+      let style2 = container.style;
+      style2.position = "absolute";
+      style2.width = "100%";
+      style2.height = "100%";
+      context2 = createCanvasContext2D();
+      const canvas = context2.canvas;
+      container.appendChild(canvas);
+      style2 = canvas.style;
+      style2.position = "absolute";
+      style2.left = "0";
+      style2.transformOrigin = "top left";
+      this.container = container;
+      this.context = context2;
+    }
+    if (!this.containerReused && backgroundColor && !this.container.style.backgroundColor) {
+      this.container.style.backgroundColor = backgroundColor;
+    }
+  }
+  clipUnrotated(context2, frameState, extent2) {
+    const topLeft = getTopLeft(extent2);
+    const topRight = getTopRight(extent2);
+    const bottomRight = getBottomRight(extent2);
+    const bottomLeft = getBottomLeft(extent2);
+    apply(frameState.coordinateToPixelTransform, topLeft);
+    apply(frameState.coordinateToPixelTransform, topRight);
+    apply(frameState.coordinateToPixelTransform, bottomRight);
+    apply(frameState.coordinateToPixelTransform, bottomLeft);
+    const inverted = this.inversePixelTransform;
+    apply(inverted, topLeft);
+    apply(inverted, topRight);
+    apply(inverted, bottomRight);
+    apply(inverted, bottomLeft);
+    context2.save();
+    context2.beginPath();
+    context2.moveTo(Math.round(topLeft[0]), Math.round(topLeft[1]));
+    context2.lineTo(Math.round(topRight[0]), Math.round(topRight[1]));
+    context2.lineTo(Math.round(bottomRight[0]), Math.round(bottomRight[1]));
+    context2.lineTo(Math.round(bottomLeft[0]), Math.round(bottomLeft[1]));
+    context2.clip();
+  }
+  dispatchRenderEvent_(type, context2, frameState) {
+    const layer = this.getLayer();
+    if (layer.hasListener(type)) {
+      const event = new RenderEvent$1(
+        type,
+        this.inversePixelTransform,
+        frameState,
+        context2
+      );
+      layer.dispatchEvent(event);
+    }
+  }
+  preRender(context2, frameState) {
+    this.frameState = frameState;
+    this.dispatchRenderEvent_(RenderEventType.PRERENDER, context2, frameState);
+  }
+  postRender(context2, frameState) {
+    this.dispatchRenderEvent_(RenderEventType.POSTRENDER, context2, frameState);
+  }
+  getRenderTransform(center, resolution, rotation, pixelRatio, width, height, offsetX) {
+    const dx1 = width / 2;
+    const dy1 = height / 2;
+    const sx = pixelRatio / resolution;
+    const sy = -sx;
+    const dx2 = -center[0] + offsetX;
+    const dy2 = -center[1];
+    return compose(
+      this.tempTransform,
+      dx1,
+      dy1,
+      sx,
+      sy,
+      -rotation,
+      dx2,
+      dy2
+    );
+  }
+  disposeInternal() {
+    delete this.frameState;
+    super.disposeInternal();
+  }
+}
+const CanvasLayerRenderer$1 = CanvasLayerRenderer;
+class CanvasImageLayerRenderer extends CanvasLayerRenderer$1 {
+  constructor(imageLayer) {
+    super(imageLayer);
+    this.image_ = null;
+  }
+  getImage() {
+    return !this.image_ ? null : this.image_.getImage();
+  }
+  prepareFrame(frameState) {
+    const layerState = frameState.layerStatesArray[frameState.layerIndex];
+    const pixelRatio = frameState.pixelRatio;
+    const viewState = frameState.viewState;
+    const viewResolution = viewState.resolution;
+    const imageSource = this.getLayer().getSource();
+    const hints = frameState.viewHints;
+    let renderedExtent = frameState.extent;
+    if (layerState.extent !== void 0) {
+      renderedExtent = getIntersection(
+        renderedExtent,
+        fromUserExtent(layerState.extent, viewState.projection)
+      );
+    }
+    if (!hints[ViewHint.ANIMATING] && !hints[ViewHint.INTERACTING] && !isEmpty(renderedExtent)) {
+      if (imageSource) {
+        const projection = viewState.projection;
+        const image = imageSource.getImage(
+          renderedExtent,
+          viewResolution,
+          pixelRatio,
+          projection
+        );
+        if (image) {
+          if (this.loadImage(image)) {
+            this.image_ = image;
+          } else if (image.getState() === ImageState.EMPTY) {
+            this.image_ = null;
+          }
+        }
+      } else {
+        this.image_ = null;
+      }
+    }
+    return !!this.image_;
+  }
+  getData(pixel) {
+    const frameState = this.frameState;
+    if (!frameState) {
+      return null;
+    }
+    const layer = this.getLayer();
+    const coordinate = apply(
+      frameState.pixelToCoordinateTransform,
+      pixel.slice()
+    );
+    const layerExtent = layer.getExtent();
+    if (layerExtent) {
+      if (!containsCoordinate(layerExtent, coordinate)) {
+        return null;
+      }
+    }
+    const imageExtent = this.image_.getExtent();
+    const img = this.image_.getImage();
+    const imageMapWidth = getWidth(imageExtent);
+    const col = Math.floor(
+      img.width * ((coordinate[0] - imageExtent[0]) / imageMapWidth)
+    );
+    if (col < 0 || col >= img.width) {
+      return null;
+    }
+    const imageMapHeight = getHeight(imageExtent);
+    const row = Math.floor(
+      img.height * ((imageExtent[3] - coordinate[1]) / imageMapHeight)
+    );
+    if (row < 0 || row >= img.height) {
+      return null;
+    }
+    return this.getImageData(img, col, row);
+  }
+  renderFrame(frameState, target) {
+    const image = this.image_;
+    const imageExtent = image.getExtent();
+    const imageResolution = image.getResolution();
+    const imagePixelRatio = image.getPixelRatio();
+    const layerState = frameState.layerStatesArray[frameState.layerIndex];
+    const pixelRatio = frameState.pixelRatio;
+    const viewState = frameState.viewState;
+    const viewCenter = viewState.center;
+    const viewResolution = viewState.resolution;
+    const scale2 = pixelRatio * imageResolution / (viewResolution * imagePixelRatio);
+    const extent2 = frameState.extent;
+    const resolution = viewState.resolution;
+    const rotation = viewState.rotation;
+    const width = Math.round(getWidth(extent2) / resolution * pixelRatio);
+    const height = Math.round(getHeight(extent2) / resolution * pixelRatio);
+    compose(
+      this.pixelTransform,
+      frameState.size[0] / 2,
+      frameState.size[1] / 2,
+      1 / pixelRatio,
+      1 / pixelRatio,
+      rotation,
+      -width / 2,
+      -height / 2
+    );
+    makeInverse(this.inversePixelTransform, this.pixelTransform);
+    const canvasTransform = toString$1(this.pixelTransform);
+    this.useContainer(target, canvasTransform, this.getBackground(frameState));
+    const context2 = this.context;
+    const canvas = context2.canvas;
+    if (canvas.width != width || canvas.height != height) {
+      canvas.width = width;
+      canvas.height = height;
+    } else if (!this.containerReused) {
+      context2.clearRect(0, 0, width, height);
+    }
+    let clipped = false;
+    let render2 = true;
+    if (layerState.extent) {
+      const layerExtent = fromUserExtent(
+        layerState.extent,
+        viewState.projection
+      );
+      render2 = intersects(layerExtent, frameState.extent);
+      clipped = render2 && !containsExtent(layerExtent, frameState.extent);
+      if (clipped) {
+        this.clipUnrotated(context2, frameState, layerExtent);
+      }
+    }
+    const img = image.getImage();
+    const transform2 = compose(
+      this.tempTransform,
+      width / 2,
+      height / 2,
+      scale2,
+      scale2,
+      0,
+      imagePixelRatio * (imageExtent[0] - viewCenter[0]) / imageResolution,
+      imagePixelRatio * (viewCenter[1] - imageExtent[3]) / imageResolution
+    );
+    this.renderedResolution = imageResolution * pixelRatio / imagePixelRatio;
+    const dw = img.width * transform2[0];
+    const dh = img.height * transform2[3];
+    if (!this.getLayer().getSource().getInterpolate()) {
+      context2.imageSmoothingEnabled = false;
+    }
+    this.preRender(context2, frameState);
+    if (render2 && dw >= 0.5 && dh >= 0.5) {
+      const dx = transform2[4];
+      const dy = transform2[5];
+      const opacity = layerState.opacity;
+      let previousAlpha;
+      if (opacity !== 1) {
+        previousAlpha = context2.globalAlpha;
+        context2.globalAlpha = opacity;
+      }
+      context2.drawImage(img, 0, 0, +img.width, +img.height, dx, dy, dw, dh);
+      if (opacity !== 1) {
+        context2.globalAlpha = previousAlpha;
+      }
+    }
+    this.postRender(context2, frameState);
+    if (clipped) {
+      context2.restore();
+    }
+    context2.imageSmoothingEnabled = true;
+    if (canvasTransform !== canvas.style.transform) {
+      canvas.style.transform = canvasTransform;
+    }
+    return this.container;
+  }
+}
+const CanvasImageLayerRenderer$1 = CanvasImageLayerRenderer;
+class ImageLayer extends BaseImageLayer$1 {
+  constructor(options) {
+    super(options);
+  }
+  createRenderer() {
+    return new CanvasImageLayerRenderer$1(this);
+  }
+  getData(pixel) {
+    return super.getData(pixel);
+  }
+}
+const ImageLayer$1 = ImageLayer;
+class ReprojImage extends ImageBase$1 {
+  constructor(sourceProj, targetProj, targetExtent, targetResolution, pixelRatio, getImageFunction, interpolate) {
+    const maxSourceExtent = sourceProj.getExtent();
+    const maxTargetExtent = targetProj.getExtent();
+    const limitedTargetExtent = maxTargetExtent ? getIntersection(targetExtent, maxTargetExtent) : targetExtent;
+    const targetCenter = getCenter(limitedTargetExtent);
+    const sourceResolution = calculateSourceResolution(
+      sourceProj,
+      targetProj,
+      targetCenter,
+      targetResolution
+    );
+    const errorThresholdInPixels = ERROR_THRESHOLD;
+    const triangulation = new Triangulation$1(
+      sourceProj,
+      targetProj,
+      limitedTargetExtent,
+      maxSourceExtent,
+      sourceResolution * errorThresholdInPixels,
+      targetResolution
+    );
+    const sourceExtent = triangulation.calculateSourceExtent();
+    const sourceImage = getImageFunction(
+      sourceExtent,
+      sourceResolution,
+      pixelRatio
+    );
+    const state = sourceImage ? ImageState.IDLE : ImageState.EMPTY;
+    const sourcePixelRatio = sourceImage ? sourceImage.getPixelRatio() : 1;
+    super(targetExtent, targetResolution, sourcePixelRatio, state);
+    this.targetProj_ = targetProj;
+    this.maxSourceExtent_ = maxSourceExtent;
+    this.triangulation_ = triangulation;
+    this.targetResolution_ = targetResolution;
+    this.targetExtent_ = targetExtent;
+    this.sourceImage_ = sourceImage;
+    this.sourcePixelRatio_ = sourcePixelRatio;
+    this.interpolate_ = interpolate;
+    this.canvas_ = null;
+    this.sourceListenerKey_ = null;
+  }
+  disposeInternal() {
+    if (this.state == ImageState.LOADING) {
+      this.unlistenSource_();
+    }
+    super.disposeInternal();
+  }
+  getImage() {
+    return this.canvas_;
+  }
+  getProjection() {
+    return this.targetProj_;
+  }
+  reproject_() {
+    const sourceState = this.sourceImage_.getState();
+    if (sourceState == ImageState.LOADED) {
+      const width = getWidth(this.targetExtent_) / this.targetResolution_;
+      const height = getHeight(this.targetExtent_) / this.targetResolution_;
+      this.canvas_ = render(
+        width,
+        height,
+        this.sourcePixelRatio_,
+        this.sourceImage_.getResolution(),
+        this.maxSourceExtent_,
+        this.targetResolution_,
+        this.targetExtent_,
+        this.triangulation_,
+        [
+          {
+            extent: this.sourceImage_.getExtent(),
+            image: this.sourceImage_.getImage()
+          }
+        ],
+        0,
+        void 0,
+        this.interpolate_
+      );
+    }
+    this.state = sourceState;
+    this.changed();
+  }
+  load() {
+    if (this.state == ImageState.IDLE) {
+      this.state = ImageState.LOADING;
+      this.changed();
+      const sourceState = this.sourceImage_.getState();
+      if (sourceState == ImageState.LOADED || sourceState == ImageState.ERROR) {
+        this.reproject_();
+      } else {
+        this.sourceListenerKey_ = listen(
+          this.sourceImage_,
+          EventType.CHANGE,
+          function(e) {
+            const sourceState2 = this.sourceImage_.getState();
+            if (sourceState2 == ImageState.LOADED || sourceState2 == ImageState.ERROR) {
+              this.unlistenSource_();
+              this.reproject_();
+            }
+          },
+          this
+        );
+        this.sourceImage_.load();
+      }
+    }
+  }
+  unlistenSource_() {
+    unlistenByKey(
+      this.sourceListenerKey_
+    );
+    this.sourceListenerKey_ = null;
+  }
+}
+const ReprojImage$1 = ReprojImage;
+const ImageSourceEventType = {
+  IMAGELOADSTART: "imageloadstart",
+  IMAGELOADEND: "imageloadend",
+  IMAGELOADERROR: "imageloaderror"
+};
+class ImageSourceEvent extends Event {
+  constructor(type, image) {
+    super(type);
+    this.image = image;
+  }
+}
+class ImageSource extends Source$1 {
+  constructor(options) {
+    super({
+      attributions: options.attributions,
+      projection: options.projection,
+      state: options.state,
+      interpolate: options.interpolate !== void 0 ? options.interpolate : true
+    });
+    this.on;
+    this.once;
+    this.un;
+    this.resolutions_ = options.resolutions !== void 0 ? options.resolutions : null;
+    this.reprojectedImage_ = null;
+    this.reprojectedRevision_ = 0;
+  }
+  getResolutions() {
+    return this.resolutions_;
+  }
+  findNearestResolution(resolution) {
+    if (this.resolutions_) {
+      const idx = linearFindNearest(this.resolutions_, resolution, 0);
+      resolution = this.resolutions_[idx];
+    }
+    return resolution;
+  }
+  getImage(extent2, resolution, pixelRatio, projection) {
+    const sourceProjection = this.getProjection();
+    if (!sourceProjection || !projection || equivalent(sourceProjection, projection)) {
+      if (sourceProjection) {
+        projection = sourceProjection;
+      }
+      return this.getImageInternal(extent2, resolution, pixelRatio, projection);
+    } else {
+      if (this.reprojectedImage_) {
+        if (this.reprojectedRevision_ == this.getRevision() && equivalent(this.reprojectedImage_.getProjection(), projection) && this.reprojectedImage_.getResolution() == resolution && equals$1(this.reprojectedImage_.getExtent(), extent2)) {
+          return this.reprojectedImage_;
+        }
+        this.reprojectedImage_.dispose();
+        this.reprojectedImage_ = null;
+      }
+      this.reprojectedImage_ = new ReprojImage$1(
+        sourceProjection,
+        projection,
+        extent2,
+        resolution,
+        pixelRatio,
+        function(extent3, resolution2, pixelRatio2) {
+          return this.getImageInternal(
+            extent3,
+            resolution2,
+            pixelRatio2,
+            sourceProjection
+          );
+        }.bind(this),
+        this.getInterpolate()
+      );
+      this.reprojectedRevision_ = this.getRevision();
+      return this.reprojectedImage_;
+    }
+  }
+  getImageInternal(extent2, resolution, pixelRatio, projection) {
+    return abstract();
+  }
+  handleImageChange(event) {
+    const image = event.target;
+    let type;
+    switch (image.getState()) {
+      case ImageState.LOADING:
+        this.loading = true;
+        type = ImageSourceEventType.IMAGELOADSTART;
+        break;
+      case ImageState.LOADED:
+        this.loading = false;
+        type = ImageSourceEventType.IMAGELOADEND;
+        break;
+      case ImageState.ERROR:
+        this.loading = false;
+        type = ImageSourceEventType.IMAGELOADERROR;
+        break;
+      default:
+        return;
+    }
+    if (this.hasListener(type)) {
+      this.dispatchEvent(new ImageSourceEvent(type, image));
+    }
+  }
+}
+const ImageSource$1 = ImageSource;
+class CanvasTileLayerRenderer extends CanvasLayerRenderer$1 {
+  constructor(tileLayer) {
+    super(tileLayer);
+    this.extentChanged = true;
+    this.renderedExtent_ = null;
+    this.renderedPixelRatio;
+    this.renderedProjection = null;
+    this.renderedRevision;
+    this.renderedTiles = [];
+    this.newTiles_ = false;
+    this.tmpExtent = createEmpty();
+    this.tmpTileRange_ = new TileRange$1(0, 0, 0, 0);
+  }
+  isDrawableTile(tile) {
+    const tileLayer = this.getLayer();
+    const tileState = tile.getState();
+    const useInterimTilesOnError = tileLayer.getUseInterimTilesOnError();
+    return tileState == TileState.LOADED || tileState == TileState.EMPTY || tileState == TileState.ERROR && !useInterimTilesOnError;
+  }
+  getTile(z, x, y, frameState) {
+    const pixelRatio = frameState.pixelRatio;
+    const projection = frameState.viewState.projection;
+    const tileLayer = this.getLayer();
+    const tileSource = tileLayer.getSource();
+    let tile = tileSource.getTile(z, x, y, pixelRatio, projection);
+    if (tile.getState() == TileState.ERROR) {
+      if (tileLayer.getUseInterimTilesOnError() && tileLayer.getPreload() > 0) {
+        this.newTiles_ = true;
+      }
+    }
+    if (!this.isDrawableTile(tile)) {
+      tile = tile.getInterimTile();
+    }
+    return tile;
+  }
+  getData(pixel) {
+    const frameState = this.frameState;
+    if (!frameState) {
+      return null;
+    }
+    const layer = this.getLayer();
+    const coordinate = apply(
+      frameState.pixelToCoordinateTransform,
+      pixel.slice()
+    );
+    const layerExtent = layer.getExtent();
+    if (layerExtent) {
+      if (!containsCoordinate(layerExtent, coordinate)) {
+        return null;
+      }
+    }
+    const pixelRatio = frameState.pixelRatio;
+    const projection = frameState.viewState.projection;
+    const viewState = frameState.viewState;
+    const source = layer.getRenderSource();
+    const tileGrid = source.getTileGridForProjection(viewState.projection);
+    const tilePixelRatio = source.getTilePixelRatio(frameState.pixelRatio);
+    for (let z = tileGrid.getZForResolution(viewState.resolution); z >= tileGrid.getMinZoom(); --z) {
+      const tileCoord = tileGrid.getTileCoordForCoordAndZ(coordinate, z);
+      const tile = source.getTile(
+        z,
+        tileCoord[1],
+        tileCoord[2],
+        pixelRatio,
+        projection
+      );
+      if (!(tile instanceof ImageTile$1 || tile instanceof ReprojTile$1) || tile instanceof ReprojTile$1 && tile.getState() === TileState.EMPTY) {
+        return null;
+      }
+      if (tile.getState() !== TileState.LOADED) {
+        continue;
+      }
+      const tileOrigin = tileGrid.getOrigin(z);
+      const tileSize = toSize(tileGrid.getTileSize(z));
+      const tileResolution = tileGrid.getResolution(z);
+      const col = Math.floor(
+        tilePixelRatio * ((coordinate[0] - tileOrigin[0]) / tileResolution - tileCoord[1] * tileSize[0])
+      );
+      const row = Math.floor(
+        tilePixelRatio * ((tileOrigin[1] - coordinate[1]) / tileResolution - tileCoord[2] * tileSize[1])
+      );
+      const gutter = Math.round(
+        tilePixelRatio * source.getGutterForProjection(viewState.projection)
+      );
+      return this.getImageData(tile.getImage(), col + gutter, row + gutter);
+    }
+    return null;
+  }
+  loadedTileCallback(tiles, zoom, tile) {
+    if (this.isDrawableTile(tile)) {
+      return super.loadedTileCallback(tiles, zoom, tile);
+    }
+    return false;
+  }
+  prepareFrame(frameState) {
+    return !!this.getLayer().getSource();
+  }
+  renderFrame(frameState, target) {
+    const layerState = frameState.layerStatesArray[frameState.layerIndex];
+    const viewState = frameState.viewState;
+    const projection = viewState.projection;
+    const viewResolution = viewState.resolution;
+    const viewCenter = viewState.center;
+    const rotation = viewState.rotation;
+    const pixelRatio = frameState.pixelRatio;
+    const tileLayer = this.getLayer();
+    const tileSource = tileLayer.getSource();
+    const sourceRevision = tileSource.getRevision();
+    const tileGrid = tileSource.getTileGridForProjection(projection);
+    const z = tileGrid.getZForResolution(viewResolution, tileSource.zDirection);
+    const tileResolution = tileGrid.getResolution(z);
+    let extent2 = frameState.extent;
+    const resolution = frameState.viewState.resolution;
+    const tilePixelRatio = tileSource.getTilePixelRatio(pixelRatio);
+    const width = Math.round(getWidth(extent2) / resolution * pixelRatio);
+    const height = Math.round(getHeight(extent2) / resolution * pixelRatio);
+    const layerExtent = layerState.extent && fromUserExtent(layerState.extent);
+    if (layerExtent) {
+      extent2 = getIntersection(
+        extent2,
+        fromUserExtent(layerState.extent)
+      );
+    }
+    const dx = tileResolution * width / 2 / tilePixelRatio;
+    const dy = tileResolution * height / 2 / tilePixelRatio;
+    const canvasExtent = [
+      viewCenter[0] - dx,
+      viewCenter[1] - dy,
+      viewCenter[0] + dx,
+      viewCenter[1] + dy
+    ];
+    const tileRange = tileGrid.getTileRangeForExtentAndZ(extent2, z);
+    const tilesToDrawByZ = {};
+    tilesToDrawByZ[z] = {};
+    const findLoadedTiles = this.createLoadedTileFinder(
+      tileSource,
+      projection,
+      tilesToDrawByZ
+    );
+    const tmpExtent = this.tmpExtent;
+    const tmpTileRange = this.tmpTileRange_;
+    this.newTiles_ = false;
+    const viewport = rotation ? getRotatedViewport(
+      viewState.center,
+      resolution,
+      rotation,
+      frameState.size
+    ) : void 0;
+    for (let x = tileRange.minX; x <= tileRange.maxX; ++x) {
+      for (let y = tileRange.minY; y <= tileRange.maxY; ++y) {
+        if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
+          continue;
+        }
+        const tile = this.getTile(z, x, y, frameState);
+        if (this.isDrawableTile(tile)) {
+          const uid = getUid(this);
+          if (tile.getState() == TileState.LOADED) {
+            tilesToDrawByZ[z][tile.tileCoord.toString()] = tile;
+            let inTransition = tile.inTransition(uid);
+            if (inTransition && layerState.opacity !== 1) {
+              tile.endTransition(uid);
+              inTransition = false;
+            }
+            if (!this.newTiles_ && (inTransition || !this.renderedTiles.includes(tile))) {
+              this.newTiles_ = true;
+            }
+          }
+          if (tile.getAlpha(uid, frameState.time) === 1) {
+            continue;
+          }
+        }
+        const childTileRange = tileGrid.getTileCoordChildTileRange(
+          tile.tileCoord,
+          tmpTileRange,
+          tmpExtent
+        );
+        let covered = false;
+        if (childTileRange) {
+          covered = findLoadedTiles(z + 1, childTileRange);
+        }
+        if (!covered) {
+          tileGrid.forEachTileCoordParentTileRange(
+            tile.tileCoord,
+            findLoadedTiles,
+            tmpTileRange,
+            tmpExtent
+          );
+        }
+      }
+    }
+    const canvasScale = tileResolution / viewResolution * pixelRatio / tilePixelRatio;
+    compose(
+      this.pixelTransform,
+      frameState.size[0] / 2,
+      frameState.size[1] / 2,
+      1 / pixelRatio,
+      1 / pixelRatio,
+      rotation,
+      -width / 2,
+      -height / 2
+    );
+    const canvasTransform = toString$1(this.pixelTransform);
+    this.useContainer(target, canvasTransform, this.getBackground(frameState));
+    const context2 = this.context;
+    const canvas = context2.canvas;
+    makeInverse(this.inversePixelTransform, this.pixelTransform);
+    compose(
+      this.tempTransform,
+      width / 2,
+      height / 2,
+      canvasScale,
+      canvasScale,
+      0,
+      -width / 2,
+      -height / 2
+    );
+    if (canvas.width != width || canvas.height != height) {
+      canvas.width = width;
+      canvas.height = height;
+    } else if (!this.containerReused) {
+      context2.clearRect(0, 0, width, height);
+    }
+    if (layerExtent) {
+      this.clipUnrotated(context2, frameState, layerExtent);
+    }
+    if (!tileSource.getInterpolate()) {
+      context2.imageSmoothingEnabled = false;
+    }
+    this.preRender(context2, frameState);
+    this.renderedTiles.length = 0;
+    let zs = Object.keys(tilesToDrawByZ).map(Number);
+    zs.sort(numberSafeCompareFunction);
+    let clips, clipZs, currentClip;
+    if (layerState.opacity === 1 && (!this.containerReused || tileSource.getOpaque(frameState.viewState.projection))) {
+      zs = zs.reverse();
+    } else {
+      clips = [];
+      clipZs = [];
+    }
+    for (let i = zs.length - 1; i >= 0; --i) {
+      const currentZ = zs[i];
+      const currentTilePixelSize = tileSource.getTilePixelSize(
+        currentZ,
+        pixelRatio,
+        projection
+      );
+      const currentResolution = tileGrid.getResolution(currentZ);
+      const currentScale = currentResolution / tileResolution;
+      const dx2 = currentTilePixelSize[0] * currentScale * canvasScale;
+      const dy2 = currentTilePixelSize[1] * currentScale * canvasScale;
+      const originTileCoord = tileGrid.getTileCoordForCoordAndZ(
+        getTopLeft(canvasExtent),
+        currentZ
+      );
+      const originTileExtent = tileGrid.getTileCoordExtent(originTileCoord);
+      const origin = apply(this.tempTransform, [
+        tilePixelRatio * (originTileExtent[0] - canvasExtent[0]) / tileResolution,
+        tilePixelRatio * (canvasExtent[3] - originTileExtent[3]) / tileResolution
+      ]);
+      const tileGutter = tilePixelRatio * tileSource.getGutterForProjection(projection);
+      const tilesToDraw = tilesToDrawByZ[currentZ];
+      for (const tileCoordKey in tilesToDraw) {
+        const tile = tilesToDraw[tileCoordKey];
+        const tileCoord = tile.tileCoord;
+        const xIndex = originTileCoord[1] - tileCoord[1];
+        const nextX = Math.round(origin[0] - (xIndex - 1) * dx2);
+        const yIndex = originTileCoord[2] - tileCoord[2];
+        const nextY = Math.round(origin[1] - (yIndex - 1) * dy2);
+        const x = Math.round(origin[0] - xIndex * dx2);
+        const y = Math.round(origin[1] - yIndex * dy2);
+        const w = nextX - x;
+        const h = nextY - y;
+        const transition = z === currentZ;
+        const inTransition = transition && tile.getAlpha(getUid(this), frameState.time) !== 1;
+        let contextSaved = false;
+        if (!inTransition) {
+          if (clips) {
+            currentClip = [x, y, x + w, y, x + w, y + h, x, y + h];
+            for (let i2 = 0, ii = clips.length; i2 < ii; ++i2) {
+              if (z !== currentZ && currentZ < clipZs[i2]) {
+                const clip = clips[i2];
+                if (intersects(
+                  [x, y, x + w, y + h],
+                  [clip[0], clip[3], clip[4], clip[7]]
+                )) {
+                  if (!contextSaved) {
+                    context2.save();
+                    contextSaved = true;
+                  }
+                  context2.beginPath();
+                  context2.moveTo(currentClip[0], currentClip[1]);
+                  context2.lineTo(currentClip[2], currentClip[3]);
+                  context2.lineTo(currentClip[4], currentClip[5]);
+                  context2.lineTo(currentClip[6], currentClip[7]);
+                  context2.moveTo(clip[6], clip[7]);
+                  context2.lineTo(clip[4], clip[5]);
+                  context2.lineTo(clip[2], clip[3]);
+                  context2.lineTo(clip[0], clip[1]);
+                  context2.clip();
+                }
+              }
+            }
+            clips.push(currentClip);
+            clipZs.push(currentZ);
+          } else {
+            context2.clearRect(x, y, w, h);
+          }
+        }
+        this.drawTileImage(
+          tile,
+          frameState,
+          x,
+          y,
+          w,
+          h,
+          tileGutter,
+          transition
+        );
+        if (clips && !inTransition) {
+          if (contextSaved) {
+            context2.restore();
+          }
+          this.renderedTiles.unshift(tile);
+        } else {
+          this.renderedTiles.push(tile);
+        }
+        this.updateUsedTiles(frameState.usedTiles, tileSource, tile);
+      }
+    }
+    this.renderedRevision = sourceRevision;
+    this.renderedResolution = tileResolution;
+    this.extentChanged = !this.renderedExtent_ || !equals$1(this.renderedExtent_, canvasExtent);
+    this.renderedExtent_ = canvasExtent;
+    this.renderedPixelRatio = pixelRatio;
+    this.renderedProjection = projection;
+    this.manageTilePyramid(
+      frameState,
+      tileSource,
+      tileGrid,
+      pixelRatio,
+      projection,
+      extent2,
+      z,
+      tileLayer.getPreload()
+    );
+    this.scheduleExpireCache(frameState, tileSource);
+    this.postRender(context2, frameState);
+    if (layerState.extent) {
+      context2.restore();
+    }
+    context2.imageSmoothingEnabled = true;
+    if (canvasTransform !== canvas.style.transform) {
+      canvas.style.transform = canvasTransform;
+    }
+    return this.container;
+  }
+  drawTileImage(tile, frameState, x, y, w, h, gutter, transition) {
+    const image = this.getTileImage(tile);
+    if (!image) {
+      return;
+    }
+    const uid = getUid(this);
+    const layerState = frameState.layerStatesArray[frameState.layerIndex];
+    const alpha = layerState.opacity * (transition ? tile.getAlpha(uid, frameState.time) : 1);
+    const alphaChanged = alpha !== this.context.globalAlpha;
+    if (alphaChanged) {
+      this.context.save();
+      this.context.globalAlpha = alpha;
+    }
+    this.context.drawImage(
+      image,
+      gutter,
+      gutter,
+      image.width - 2 * gutter,
+      image.height - 2 * gutter,
+      x,
+      y,
+      w,
+      h
+    );
+    if (alphaChanged) {
+      this.context.restore();
+    }
+    if (alpha !== layerState.opacity) {
+      frameState.animate = true;
+    } else if (transition) {
+      tile.endTransition(uid);
+    }
+  }
+  getImage() {
+    const context2 = this.context;
+    return context2 ? context2.canvas : null;
+  }
+  getTileImage(tile) {
+    return tile.getImage();
+  }
+  scheduleExpireCache(frameState, tileSource) {
+    if (tileSource.canExpireCache()) {
+      const postRenderFunction = function(tileSource2, map2, frameState2) {
+        const tileSourceKey = getUid(tileSource2);
+        if (tileSourceKey in frameState2.usedTiles) {
+          tileSource2.expireCache(
+            frameState2.viewState.projection,
+            frameState2.usedTiles[tileSourceKey]
+          );
+        }
+      }.bind(null, tileSource);
+      frameState.postRenderFunctions.push(
+        postRenderFunction
+      );
+    }
+  }
+  updateUsedTiles(usedTiles, tileSource, tile) {
+    const tileSourceKey = getUid(tileSource);
+    if (!(tileSourceKey in usedTiles)) {
+      usedTiles[tileSourceKey] = {};
+    }
+    usedTiles[tileSourceKey][tile.getKey()] = true;
+  }
+  manageTilePyramid(frameState, tileSource, tileGrid, pixelRatio, projection, extent2, currentZ, preload, tileCallback) {
+    const tileSourceKey = getUid(tileSource);
+    if (!(tileSourceKey in frameState.wantedTiles)) {
+      frameState.wantedTiles[tileSourceKey] = {};
+    }
+    const wantedTiles = frameState.wantedTiles[tileSourceKey];
+    const tileQueue = frameState.tileQueue;
+    const minZoom = tileGrid.getMinZoom();
+    const rotation = frameState.viewState.rotation;
+    const viewport = rotation ? getRotatedViewport(
+      frameState.viewState.center,
+      frameState.viewState.resolution,
+      rotation,
+      frameState.size
+    ) : void 0;
+    let tileCount = 0;
+    let tile, tileRange, tileResolution, x, y, z;
+    for (z = minZoom; z <= currentZ; ++z) {
+      tileRange = tileGrid.getTileRangeForExtentAndZ(extent2, z, tileRange);
+      tileResolution = tileGrid.getResolution(z);
+      for (x = tileRange.minX; x <= tileRange.maxX; ++x) {
+        for (y = tileRange.minY; y <= tileRange.maxY; ++y) {
+          if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
+            continue;
+          }
+          if (currentZ - z <= preload) {
+            ++tileCount;
+            tile = tileSource.getTile(z, x, y, pixelRatio, projection);
+            if (tile.getState() == TileState.IDLE) {
+              wantedTiles[tile.getKey()] = true;
+              if (!tileQueue.isKeyQueued(tile.getKey())) {
+                tileQueue.enqueue([
+                  tile,
+                  tileSourceKey,
+                  tileGrid.getTileCoordCenter(tile.tileCoord),
+                  tileResolution
+                ]);
+              }
+            }
+            if (tileCallback !== void 0) {
+              tileCallback(tile);
+            }
+          } else {
+            tileSource.useTile(z, x, y, projection);
+          }
+        }
+      }
+    }
+    tileSource.updateCacheSize(tileCount, projection);
+  }
+}
+const CanvasTileLayerRenderer$1 = CanvasTileLayerRenderer;
+class TileLayer extends BaseTileLayer$1 {
+  constructor(options) {
+    super(options);
+  }
+  createRenderer() {
+    return new CanvasTileLayerRenderer$1(this);
+  }
+}
+const TileLayer$1 = TileLayer;
+let hasImageData = true;
+try {
+  new ImageData(10, 10);
+} catch (_) {
+  hasImageData = false;
+}
+let context;
+function newImageData(data, width, height) {
+  if (hasImageData) {
+    return new ImageData(data, width, height);
+  }
+  if (!context) {
+    context = document.createElement("canvas").getContext("2d");
+  }
+  const imageData = context.createImageData(width, height);
+  imageData.data.set(data);
+  return imageData;
+}
+function createMinion(operation) {
+  let workerHasImageData = true;
+  try {
+    new ImageData(10, 10);
+  } catch (_) {
+    workerHasImageData = false;
+  }
+  function newWorkerImageData(data, width, height) {
+    if (workerHasImageData) {
+      return new ImageData(data, width, height);
+    } else {
+      return { data, width, height };
+    }
+  }
+  return function(data) {
+    const buffers = data["buffers"];
+    const meta = data["meta"];
+    const imageOps = data["imageOps"];
+    const width = data["width"];
+    const height = data["height"];
+    const numBuffers = buffers.length;
+    const numBytes = buffers[0].byteLength;
+    if (imageOps) {
+      const images = new Array(numBuffers);
+      for (let b = 0; b < numBuffers; ++b) {
+        images[b] = newWorkerImageData(
+          new Uint8ClampedArray(buffers[b]),
+          width,
+          height
+        );
+      }
+      const output2 = operation(images, meta).data;
+      return output2.buffer;
+    }
+    const output = new Uint8ClampedArray(numBytes);
+    const arrays = new Array(numBuffers);
+    const pixels = new Array(numBuffers);
+    for (let b = 0; b < numBuffers; ++b) {
+      arrays[b] = new Uint8ClampedArray(buffers[b]);
+      pixels[b] = [0, 0, 0, 0];
+    }
+    for (let i = 0; i < numBytes; i += 4) {
+      for (let j = 0; j < numBuffers; ++j) {
+        const array = arrays[j];
+        pixels[j][0] = array[i];
+        pixels[j][1] = array[i + 1];
+        pixels[j][2] = array[i + 2];
+        pixels[j][3] = array[i + 3];
+      }
+      const pixel = operation(pixels, meta);
+      output[i] = pixel[0];
+      output[i + 1] = pixel[1];
+      output[i + 2] = pixel[2];
+      output[i + 3] = pixel[3];
+    }
+    return output.buffer;
+  };
+}
+function createWorker(config, onMessage) {
+  const lib = Object.keys(config.lib || {}).map(function(name) {
+    return "const " + name + " = " + config.lib[name].toString() + ";";
+  });
+  const lines = lib.concat([
+    "const __minion__ = (" + createMinion.toString() + ")(",
+    config.operation.toString(),
+    ");",
+    'self.addEventListener("message", function(event) {',
+    "  const buffer = __minion__(event.data);",
+    "  self.postMessage({buffer: buffer, meta: event.data.meta}, [buffer]);",
+    "});"
+  ]);
+  const worker = new Worker(
+    typeof Blob === "undefined" ? "data:text/javascript;base64," + Buffer.from(lines.join("\n"), "binary").toString("base64") : URL.createObjectURL(new Blob(lines, { type: "text/javascript" }))
+  );
+  worker.addEventListener("message", onMessage);
+  return worker;
+}
+function createFauxWorker(config, onMessage) {
+  const minion = createMinion(config.operation);
+  let terminated = false;
+  return {
+    postMessage: function(data) {
+      setTimeout(function() {
+        if (terminated) {
+          return;
+        }
+        onMessage({ data: { buffer: minion(data), meta: data["meta"] } });
+      }, 0);
+    },
+    terminate: function() {
+      terminated = true;
+    }
+  };
+}
+class Processor extends Disposable$1 {
+  constructor(config) {
+    super();
+    this._imageOps = !!config.imageOps;
+    let threads;
+    if (config.threads === 0) {
+      threads = 0;
+    } else if (this._imageOps) {
+      threads = 1;
+    } else {
+      threads = config.threads || 1;
+    }
+    const workers = new Array(threads);
+    if (threads) {
+      for (let i = 0; i < threads; ++i) {
+        workers[i] = createWorker(config, this._onWorkerMessage.bind(this, i));
+      }
+    } else {
+      workers[0] = createFauxWorker(
+        config,
+        this._onWorkerMessage.bind(this, 0)
+      );
+    }
+    this._workers = workers;
+    this._queue = [];
+    this._maxQueueLength = config.queue || Infinity;
+    this._running = 0;
+    this._dataLookup = {};
+    this._job = null;
+  }
+  process(inputs, meta, callback) {
+    this._enqueue({
+      inputs,
+      meta,
+      callback
+    });
+    this._dispatch();
+  }
+  _enqueue(job) {
+    this._queue.push(job);
+    while (this._queue.length > this._maxQueueLength) {
+      this._queue.shift().callback(null, null);
+    }
+  }
+  _dispatch() {
+    if (this._running || this._queue.length === 0) {
+      return;
+    }
+    const job = this._queue.shift();
+    this._job = job;
+    const width = job.inputs[0].width;
+    const height = job.inputs[0].height;
+    const buffers = job.inputs.map(function(input) {
+      return input.data.buffer;
+    });
+    const threads = this._workers.length;
+    this._running = threads;
+    if (threads === 1) {
+      this._workers[0].postMessage(
+        {
+          buffers,
+          meta: job.meta,
+          imageOps: this._imageOps,
+          width,
+          height
+        },
+        buffers
+      );
+      return;
+    }
+    const length = job.inputs[0].data.length;
+    const segmentLength = 4 * Math.ceil(length / 4 / threads);
+    for (let i = 0; i < threads; ++i) {
+      const offset = i * segmentLength;
+      const slices = [];
+      for (let j = 0, jj = buffers.length; j < jj; ++j) {
+        slices.push(buffers[j].slice(offset, offset + segmentLength));
+      }
+      this._workers[i].postMessage(
+        {
+          buffers: slices,
+          meta: job.meta,
+          imageOps: this._imageOps,
+          width,
+          height
+        },
+        slices
+      );
+    }
+  }
+  _onWorkerMessage(index, event) {
+    if (this.disposed) {
+      return;
+    }
+    this._dataLookup[index] = event.data;
+    --this._running;
+    if (this._running === 0) {
+      this._resolveJob();
+    }
+  }
+  _resolveJob() {
+    const job = this._job;
+    const threads = this._workers.length;
+    let data, meta;
+    if (threads === 1) {
+      data = new Uint8ClampedArray(this._dataLookup[0]["buffer"]);
+      meta = this._dataLookup[0]["meta"];
+    } else {
+      const length = job.inputs[0].data.length;
+      data = new Uint8ClampedArray(length);
+      meta = new Array(threads);
+      const segmentLength = 4 * Math.ceil(length / 4 / threads);
+      for (let i = 0; i < threads; ++i) {
+        const buffer = this._dataLookup[i]["buffer"];
+        const offset = i * segmentLength;
+        data.set(new Uint8ClampedArray(buffer), offset);
+        meta[i] = this._dataLookup[i]["meta"];
+      }
+    }
+    this._job = null;
+    this._dataLookup = {};
+    job.callback(
+      null,
+      newImageData(data, job.inputs[0].width, job.inputs[0].height),
+      meta
+    );
+    this._dispatch();
+  }
+  disposeInternal() {
+    for (let i = 0; i < this._workers.length; ++i) {
+      this._workers[i].terminate();
+    }
+    this._workers.length = 0;
+  }
+}
+const RasterEventType = {
+  BEFOREOPERATIONS: "beforeoperations",
+  AFTEROPERATIONS: "afteroperations"
+};
+class RasterSourceEvent extends Event {
+  constructor(type, frameState, data) {
+    super(type);
+    this.extent = frameState.extent;
+    this.resolution = frameState.viewState.resolution / frameState.pixelRatio;
+    this.data = data;
+  }
+}
+class RasterSource extends ImageSource$1 {
+  constructor(options) {
+    super({
+      projection: null
+    });
+    this.on;
+    this.once;
+    this.un;
+    this.processor_ = null;
+    this.operationType_ = options.operationType !== void 0 ? options.operationType : "pixel";
+    this.threads_ = options.threads !== void 0 ? options.threads : 1;
+    this.layers_ = createLayers(options.sources);
+    const changed = this.changed.bind(this);
+    for (let i = 0, ii = this.layers_.length; i < ii; ++i) {
+      this.layers_[i].addEventListener(EventType.CHANGE, changed);
+    }
+    this.tileQueue_ = new TileQueue$1(function() {
+      return 1;
+    }, this.changed.bind(this));
+    this.requestedFrameState_;
+    this.renderedImageCanvas_ = null;
+    this.renderedRevision_;
+    this.frameState_ = {
+      animate: false,
+      coordinateToPixelTransform: create$1(),
+      declutterTree: null,
+      extent: null,
+      index: 0,
+      layerIndex: 0,
+      layerStatesArray: getLayerStatesArray(this.layers_),
+      pixelRatio: 1,
+      pixelToCoordinateTransform: create$1(),
+      postRenderFunctions: [],
+      size: [0, 0],
+      tileQueue: this.tileQueue_,
+      time: Date.now(),
+      usedTiles: {},
+      viewState: {
+        rotation: 0
+      },
+      viewHints: [],
+      wantedTiles: {},
+      mapId: getUid(this),
+      renderTargets: {}
+    };
+    this.setAttributions(function(frameState) {
+      const attributions = [];
+      for (let index = 0, iMax = options.sources.length; index < iMax; ++index) {
+        const sourceOrLayer = options.sources[index];
+        const source = sourceOrLayer instanceof Source$1 ? sourceOrLayer : sourceOrLayer.getSource();
+        const attributionGetter = source.getAttributions();
+        if (typeof attributionGetter === "function") {
+          const sourceAttribution = attributionGetter(frameState);
+          attributions.push.apply(attributions, sourceAttribution);
+        }
+      }
+      return attributions.length !== 0 ? attributions : null;
+    });
+    if (options.operation !== void 0) {
+      this.setOperation(options.operation, options.lib);
+    }
+  }
+  setOperation(operation, lib) {
+    if (this.processor_) {
+      this.processor_.dispose();
+    }
+    this.processor_ = new Processor({
+      operation,
+      imageOps: this.operationType_ === "image",
+      queue: 1,
+      lib,
+      threads: this.threads_
+    });
+    this.changed();
+  }
+  updateFrameState_(extent2, resolution, projection) {
+    const frameState = Object.assign({}, this.frameState_);
+    frameState.viewState = Object.assign({}, frameState.viewState);
+    const center = getCenter(extent2);
+    frameState.extent = extent2.slice();
+    frameState.size[0] = Math.round(getWidth(extent2) / resolution);
+    frameState.size[1] = Math.round(getHeight(extent2) / resolution);
+    frameState.time = Date.now();
+    const viewState = frameState.viewState;
+    viewState.center = center;
+    viewState.projection = projection;
+    viewState.resolution = resolution;
+    return frameState;
+  }
+  allSourcesReady_() {
+    let ready = true;
+    let source;
+    for (let i = 0, ii = this.layers_.length; i < ii; ++i) {
+      source = this.layers_[i].getSource();
+      if (source.getState() !== "ready") {
+        ready = false;
+        break;
+      }
+    }
+    return ready;
+  }
+  getImage(extent2, resolution, pixelRatio, projection) {
+    if (!this.allSourcesReady_()) {
+      return null;
+    }
+    const frameState = this.updateFrameState_(extent2, resolution, projection);
+    this.requestedFrameState_ = frameState;
+    if (this.renderedImageCanvas_) {
+      const renderedResolution = this.renderedImageCanvas_.getResolution();
+      const renderedExtent = this.renderedImageCanvas_.getExtent();
+      if (resolution !== renderedResolution || !equals$1(extent2, renderedExtent)) {
+        this.renderedImageCanvas_ = null;
+      }
+    }
+    if (!this.renderedImageCanvas_ || this.getRevision() !== this.renderedRevision_) {
+      this.processSources_();
+    }
+    frameState.tileQueue.loadMoreTiles(16, 16);
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
+    return this.renderedImageCanvas_;
+  }
+  processSources_() {
+    const frameState = this.requestedFrameState_;
+    const len = this.layers_.length;
+    const imageDatas = new Array(len);
+    for (let i = 0; i < len; ++i) {
+      frameState.layerIndex = i;
+      const imageData = getImageData(this.layers_[i], frameState);
+      if (imageData) {
+        imageDatas[i] = imageData;
+      } else {
+        return;
+      }
+    }
+    const data = {};
+    this.dispatchEvent(
+      new RasterSourceEvent(RasterEventType.BEFOREOPERATIONS, frameState, data)
+    );
+    this.processor_.process(
+      imageDatas,
+      data,
+      this.onWorkerComplete_.bind(this, frameState)
+    );
+  }
+  onWorkerComplete_(frameState, err, output, data) {
+    if (err || !output) {
+      return;
+    }
+    const extent2 = frameState.extent;
+    const resolution = frameState.viewState.resolution;
+    if (resolution !== this.requestedFrameState_.viewState.resolution || !equals$1(extent2, this.requestedFrameState_.extent)) {
+      return;
+    }
+    let context2;
+    if (this.renderedImageCanvas_) {
+      context2 = this.renderedImageCanvas_.getImage().getContext("2d");
+    } else {
+      const width = Math.round(getWidth(extent2) / resolution);
+      const height = Math.round(getHeight(extent2) / resolution);
+      context2 = createCanvasContext2D(width, height);
+      this.renderedImageCanvas_ = new ImageCanvas$1(
+        extent2,
+        resolution,
+        1,
+        context2.canvas
+      );
+    }
+    context2.putImageData(output, 0, 0);
+    this.changed();
+    this.renderedRevision_ = this.getRevision();
+    this.dispatchEvent(
+      new RasterSourceEvent(RasterEventType.AFTEROPERATIONS, frameState, data)
+    );
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
+  }
+  disposeInternal() {
+    if (this.processor_) {
+      this.processor_.dispose();
+    }
+    super.disposeInternal();
+  }
+}
+RasterSource.prototype.dispose;
+let sharedContext = null;
+function getImageData(layer, frameState) {
+  const renderer = layer.getRenderer();
+  if (!renderer) {
+    throw new Error("Unsupported layer type: " + layer);
+  }
+  if (!renderer.prepareFrame(frameState)) {
+    return null;
+  }
+  const width = frameState.size[0];
+  const height = frameState.size[1];
+  if (width === 0 || height === 0) {
+    return null;
+  }
+  const container = renderer.renderFrame(frameState, null);
+  let element;
+  if (container instanceof HTMLCanvasElement) {
+    element = container;
+  } else {
+    if (container) {
+      element = container.firstElementChild;
+    }
+    if (!(element instanceof HTMLCanvasElement)) {
+      throw new Error("Unsupported rendered element: " + element);
+    }
+    if (element.width === width && element.height === height) {
+      const context2 = element.getContext("2d");
+      return context2.getImageData(0, 0, width, height);
+    }
+  }
+  if (!sharedContext) {
+    sharedContext = createCanvasContext2D(width, height);
+  } else {
+    const canvas = sharedContext.canvas;
+    if (canvas.width !== width || canvas.height !== height) {
+      sharedContext = createCanvasContext2D(width, height);
+    } else {
+      sharedContext.clearRect(0, 0, width, height);
+    }
+  }
+  sharedContext.drawImage(element, 0, 0, width, height);
+  return sharedContext.getImageData(0, 0, width, height);
+}
+function getLayerStatesArray(layers) {
+  return layers.map(function(layer) {
+    return layer.getLayerState();
+  });
+}
+function createLayers(sources) {
+  const len = sources.length;
+  const layers = new Array(len);
+  for (let i = 0; i < len; ++i) {
+    layers[i] = createLayer(sources[i]);
+  }
+  return layers;
+}
+function createLayer(layerOrSource) {
+  let layer;
+  if (layerOrSource instanceof Source$1) {
+    if (layerOrSource instanceof TileSource$1) {
+      layer = new TileLayer$1({ source: layerOrSource });
+    } else if (layerOrSource instanceof ImageSource$1) {
+      layer = new ImageLayer$1({ source: layerOrSource });
+    }
+  } else {
+    layer = layerOrSource;
+  }
+  return layer;
+}
+const Raster = RasterSource;
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
@@ -10914,9 +14853,14 @@ function setupScene(url) {
     crossOrigin: "anonymous",
     zDirection: -1
   });
-  let layer = new TileLayer$1({
+  let layer = new TileLayer$2({
     tileSize: 256,
-    source
+    source: new Raster({
+      sources: [source],
+      operation: function(pixels, data) {
+        return data;
+      }
+    })
   });
   source.setTileLoadFunction(tileLoadProgress);
   map = new Map$1({
@@ -10924,8 +14868,9 @@ function setupScene(url) {
     layers: [layer],
     target: "map",
     view: new View$1({
+      extent,
       enableRotation: false,
-      resolutions: layer.getSource().getTileGrid().getResolutions(),
+      resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1
     })
@@ -10968,11 +14913,12 @@ function updateImageMap(url) {
     zDirection: -1
   });
   source.setTileLoadFunction(tileLoadProgress);
-  let layer = new TileLayer$1({
+  let layer = new TileLayer$2({
     tileSize: 256,
     source
   });
   let view = new View$1({
+    extent,
     enableRotation: false,
     resolutions: layer.getSource().getTileGrid().getResolutions(),
     constrainOnlyCenter: true,
