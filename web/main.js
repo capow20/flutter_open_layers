@@ -6,8 +6,8 @@ import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
 
 let map;
-const imgWidth = 6132;
-const imgHeight = 8176;
+const imgWidth = 5192;
+const imgHeight = 6489;
 let extent = [0, -imgHeight, imgWidth, 0];
 
 function setupScene(url) {

@@ -12,8 +12,6 @@ dependencies:
   # webview
   flutter_inappwebview: ^5.7.1
 
-  local_assets_server: ^2.0.2+10
-
   flutter:
     sdk: flutter
 
