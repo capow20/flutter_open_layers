@@ -4,17 +4,20 @@ import './style.css';
 import TileLayer from 'ol/layer/WebGLTile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
-import Raster from 'ol/source/Raster';
-import {createXYZ} from 'ol/tilegrid';
+import PinchZoom from 'ol/interaction/PinchZoom';
+import DragPan from 'ol/interaction/DragPan';
+
 
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
+let currentUrl = "";
 let extent = [0, -imgHeight, imgWidth,0];
 
 function setupScene(url) {
+  currentUrl = url;
   let source = new Zoomify({
-    url: 'https://warm-mesa-43639.herokuapp.com/' + url,
+    url: 'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
     size: [imgWidth, imgHeight],
     crossOrigin: 'anonymous',
     zDirection: -1,
@@ -22,22 +25,7 @@ function setupScene(url) {
 
   let layer = new TileLayer({
     tileSize: 256,
-    source: new Raster({
-      sources: [source],
-      operation: function (pixels, data) {
-       /*  const pixel = pixels[0];
-          if (
-            pixel[0] === 0 &&
-            pixel[1] === 0 &&
-            pixel[2] === 0 &&
-            pixel[3] === 255
-          ) {
-            pixel[3] = 0;
-          }
-          return pixel; */
-          return data;
-      }
-    }),
+    source: source,
   });
 
   source.setTileLoadFunction(tileLoadProgress);
@@ -85,10 +73,11 @@ function tileLoadProgress(tile, src) {
 }
 
 function updateImageMap(url) {
+  currentUrl = url;
   let curCenter = map.getView().getCenter();
   let curZoom = map.getView().getZoom();
   let source = new Zoomify({
-      url: 'https://warm-mesa-43639.herokuapp.com/' + url,
+      url: 'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
       size: [imgWidth, imgHeight],
       crossOrigin: 'anonymous',
       zDirection: -1,
@@ -107,6 +96,28 @@ function updateImageMap(url) {
     minZoom: 1,
   });
 
+  // this is required to keep touch gestures working as ios webviews will continually consume touch events from flutter.
+  // this resets those touch gestures by removing the html element that was consuming them and recreating it
+  const mapElement = document.getElementById('map');
+  mapElement.remove();
+
+  let newMapElement = document.createElement('div');  
+  newMapElement.setAttribute('id', 'map');
+  document.body.insertAdjacentElement('afterbegin', newMapElement);
+
+  map = new Map({
+    controls: [],
+    layers: [layer],
+    target: 'map',
+    view: new View({
+      extent: extent,
+      enableRotation: false,
+      resolutions: source.getTileGrid().getResolutions(),
+      constrainOnlyCenter: true,
+      minZoom: 1,
+    }),
+  });
+
   map.setView(view);
   map.getLayers().getArray()[0] = layer;
   map.getView().fit(extent);
@@ -116,3 +127,4 @@ function updateImageMap(url) {
 
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;
+window.resetControls = resetControls;

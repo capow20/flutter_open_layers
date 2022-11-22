@@ -17,4 +17,8 @@ class OpenLayersController {
       source: 'window.setupScene("$url")',
     );
   }
+
+  Future<void> resetControls() async {
+    return webController?.evaluateJavascript(source: 'window.resetControls()');
+  }
 }

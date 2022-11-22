@@ -59,7 +59,7 @@ class _OpenLayersViewState extends State<OpenLayersView> {
                   loadMessage = message;
                 });
               }),
-              imageUrl: imageUrls[0],
+              initialUrl: imageUrls[0],
               onWebViewCreated: (OpenLayersController c) {
                 controller = c;
               },

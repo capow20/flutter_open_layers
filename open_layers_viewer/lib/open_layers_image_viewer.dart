@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:open_layers_viewer/open_layers_viewer.dart';
 
 class OpenLayersImageViewer extends StatefulWidget {
-  const OpenLayersImageViewer({super.key, required this.imageUrl, this.onWebViewCreated, required this.onLoadProgress});
-  final String imageUrl;
+  const OpenLayersImageViewer({super.key, required this.initialUrl, this.onWebViewCreated, required this.onLoadProgress});
+  final String initialUrl;
   final Function(OpenLayersController)? onWebViewCreated;
   final Function(double progress, String message)? onLoadProgress;
   @override
@@ -48,7 +48,7 @@ class _OpenLayersImageViewerState extends State<OpenLayersImageViewer> {
       },
       onLoadStop: (c, url) {
         c.clearCache();
-        controller.setupScene(widget.imageUrl);
+        controller.setupScene(widget.initialUrl);
       },
     );
   }
