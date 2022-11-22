@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:open_layers_viewer/open_layers_controller.dart';
 import 'package:open_layers_viewer/open_layers_image_viewer.dart';
-import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,7 +31,6 @@ class _OpenLayersViewState extends State<OpenLayersView> {
   OpenLayersController? controller;
   double? progress;
   String loadMessage = "";
-  bool isAbsorbing = false;
   final imageUrls = [
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_one/",
     "https://imgprd21.museumofthebible.org/mobileapi/assets/tiled/tiled_two/",
@@ -46,16 +44,12 @@ class _OpenLayersViewState extends State<OpenLayersView> {
       backgroundColor: Colors.blue,
       body: Container(
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: [
-              Colors.black,
-              Colors.grey.shade400,
-              Colors.blue.shade500,
-              Colors.blue,
-            ],
-            radius: 2,
-          ),
-        ),
+            gradient: RadialGradient(colors: [
+          Colors.black,
+          Colors.grey.shade400,
+          Colors.blue.shade500,
+          Colors.blue,
+        ], radius: 2)),
         child: Stack(
           children: [
             OpenLayersImageViewer(
@@ -72,17 +66,9 @@ class _OpenLayersViewState extends State<OpenLayersView> {
             ),
             Align(
               alignment: Alignment.bottomCenter,
-              child: SizedBox(
-                height: 200,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 80.0),
-                  child: PointerInterceptor(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: _buildLayerButtons(),
-                    ),
-                  ),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: _buildLayerButtons(),
               ),
             ),
             if (progress != 1)
@@ -113,25 +99,34 @@ class _OpenLayersViewState extends State<OpenLayersView> {
     List<Widget> imageButtons = imageUrls.map((value) {
       layerNum++;
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 15),
+        padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 15),
         child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
           onTap: () {
             controller?.updateLayer(value);
             setState(() => selectedUrl = value);
           },
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Colors.blue,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Text(
-                "Layer $layerNum",
-                style: const TextStyle(fontSize: 20, color: Colors.white),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (selectedUrl == value)
+                const Icon(
+                  Icons.star,
+                  color: Colors.deepOrangeAccent,
+                ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.blue,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  child: Text(
+                    "Layer $layerNum",
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
