@@ -11,6 +11,7 @@ dependencies:
 
   # webview
   flutter_inappwebview: ^5.7.1
+  pointer_interceptor: ^0.9.3+3
 
   flutter:
     sdk: flutter

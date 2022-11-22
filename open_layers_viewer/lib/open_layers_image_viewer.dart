@@ -1,5 +1,7 @@
 // ignore_for_file: avoid_print
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:open_layers_viewer/open_layers_viewer.dart';
 

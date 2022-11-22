@@ -4,8 +4,6 @@ import './style.css';
 import TileLayer from 'ol/layer/WebGLTile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
-import Raster from 'ol/source/Raster';
-import {createXYZ} from 'ol/tilegrid';
 
 let map;
 const imgWidth = 5192;
@@ -14,7 +12,7 @@ let extent = [0, -imgHeight, imgWidth,0];
 
 function setupScene(url) {
   let source = new Zoomify({
-    url: 'https://warm-mesa-43639.herokuapp.com/' + url,
+    url: 'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
     size: [imgWidth, imgHeight],
     crossOrigin: 'anonymous',
     zDirection: -1,
@@ -22,22 +20,7 @@ function setupScene(url) {
 
   let layer = new TileLayer({
     tileSize: 256,
-    source: new Raster({
-      sources: [source],
-      operation: function (pixels, data) {
-       /*  const pixel = pixels[0];
-          if (
-            pixel[0] === 0 &&
-            pixel[1] === 0 &&
-            pixel[2] === 0 &&
-            pixel[3] === 255
-          ) {
-            pixel[3] = 0;
-          }
-          return pixel; */
-          return data;
-      }
-    }),
+    source: source,
   });
 
   source.setTileLoadFunction(tileLoadProgress);
@@ -87,28 +70,27 @@ function tileLoadProgress(tile, src) {
 function updateImageMap(url) {
   let curCenter = map.getView().getCenter();
   let curZoom = map.getView().getZoom();
-  let source = new Zoomify({
-      url: 'https://warm-mesa-43639.herokuapp.com/' + url,
+  let newSource = new Zoomify({
+      url:'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
       size: [imgWidth, imgHeight],
       crossOrigin: 'anonymous',
       zDirection: -1,
   });
-  source.setTileLoadFunction(tileLoadProgress);
+  newSource.setTileLoadFunction(tileLoadProgress);
 
-  let layer = new TileLayer({
+  let newLayer = new TileLayer({
     tileSize: 256,
-    source: source,
+    source: newSource,
   });
-  let view = new View({
+  let newView = new View({
     extent: extent,
     enableRotation: false,
-    resolutions: layer.getSource().getTileGrid().getResolutions(),
+    resolutions: newLayer.getSource().getTileGrid().getResolutions(),
     constrainOnlyCenter: true,
     minZoom: 1,
   });
-
-  map.setView(view);
-  map.getLayers().getArray()[0] = layer;
+  map.setView(newView);
+  map.getLayers().getArray()[0] = newLayer;
   map.getView().fit(extent);
   map.getView().setZoom(curZoom);
   map.getView().setCenter(curCenter);
