@@ -51,7 +51,7 @@ function tileLoadProgress(tile, src) {
       xhr.responseType = 'blob';
   }
   xhr.addEventListener('progress', function (evt) {
-    window.flutter_inappwebview.callHandler('loadProgress', (evt.total/evt.loaded) * 100);
+    window.flutter_inappwebview.callHandler('loadProgress', (evt.loaded/evt.total) * 100.0);
   });
   xhr.addEventListener('loadend', function (evt) {
     var data = this.response;

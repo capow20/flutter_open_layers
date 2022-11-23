@@ -53,16 +53,64 @@ class _OpenLayersViewState extends State<OpenLayersView> {
         child: Stack(
           children: [
             OpenLayersImageViewer(
-              onLoadProgress: ((double prog, String message) {
-                setState(() {
-                  progress = prog / 100;
-                  loadMessage = message;
-                });
-              }),
               initialUrl: imageUrls[0],
               onWebViewCreated: (OpenLayersController c) {
                 controller = c;
               },
+              onError: (message, code) {
+                print("Error: $message, $code");
+              },
+              progressBuilder: (double? progress, String message) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      color: Colors.red,
+                      backgroundColor: Colors.black,
+                    ),
+                    const SizedBox(
+                      height: 20,
+                      width: double.infinity,
+                    ),
+                    Text(message),
+                  ],
+                );
+              },
+            ),
+            Positioned(
+              left: 20,
+              top: 100,
+              child: Container(
+                color: Colors.red,
+                height: 80,
+                width: 100,
+                child: const Center(
+                    child: Text(
+                  "Click here to break controls",
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                )),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 100,
+              child: GestureDetector(
+                onTap: () {
+                  controller?.resetControls();
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Text("RESET CONTROLS", style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ),
             ),
             Align(
               alignment: Alignment.bottomCenter,
@@ -71,23 +119,6 @@ class _OpenLayersViewState extends State<OpenLayersView> {
                 children: _buildLayerButtons(),
               ),
             ),
-            if (progress != 1)
-              Align(
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(value: progress, color: Colors.blue),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        loadMessage,
-                        style: const TextStyle(color: Colors.blue, fontSize: 15),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),
