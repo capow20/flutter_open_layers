@@ -4,8 +4,6 @@ import './style.css';
 import TileLayer from 'ol/layer/WebGLTile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
-import PinchZoom from 'ol/interaction/PinchZoom';
-import DragPan from 'ol/interaction/DragPan';
 
 
 let map;
@@ -40,10 +38,12 @@ function setupScene(url) {
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1,
-      zoom: 1,
+      zoom: 2,
     }),
   });
-  map.getView().fit(extent);
+  map.getView().fit(extent, {
+    padding: [0,25,0,25],
+  });
 }
 
 function tileLoadProgress(tile, src) {
@@ -95,6 +95,7 @@ function updateImageMap(url) {
     resolutions: layer.getSource().getTileGrid().getResolutions(),
     constrainOnlyCenter: true,
     minZoom: 1,
+
   });
 
   // this is required to keep touch gestures working as ios webviews will continually consume touch events from flutter.

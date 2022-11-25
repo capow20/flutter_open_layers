@@ -13246,10 +13246,12 @@ function setupScene(url) {
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1,
-      zoom: 1
+      zoom: 2
     })
   });
-  map.getView().fit(extent);
+  map.getView().fit(extent, {
+    padding: [0, 25, 0, 25]
+  });
 }
 function tileLoadProgress(tile, src) {
   var xhr = new XMLHttpRequest();
