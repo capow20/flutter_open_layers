@@ -13223,10 +13223,8 @@ const Zoomify$1 = Zoomify;
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
-let currentUrl = "";
 let extent = [0, -imgHeight, imgWidth, 0];
 function setupScene(url) {
-  currentUrl = url;
   let source = new Zoomify$1({
     url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + url,
     size: [imgWidth, imgHeight],
@@ -13247,19 +13245,11 @@ function setupScene(url) {
       enableRotation: false,
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
-      minZoom: 1
+      minZoom: 1,
+      zoom: 1
     })
   });
   map.getView().fit(extent);
-}
-function resetControls() {
-  console.log("resetting controls");
-  const mapElement = document.getElementById("map");
-  mapElement.remove();
-  let newMapElement = document.createElement("div");
-  newMapElement.setAttribute("id", "map");
-  document.body.insertAdjacentElement("afterbegin", newMapElement);
-  updateImageMap(currentUrl);
 }
 function tileLoadProgress(tile, src) {
   var xhr = new XMLHttpRequest();
@@ -13267,7 +13257,7 @@ function tileLoadProgress(tile, src) {
     xhr.responseType = "blob";
   };
   xhr.addEventListener("progress", function(evt) {
-    window.flutter_inappwebview.callHandler("loadProgress", evt.total / evt.loaded * 100);
+    window.flutter_inappwebview.callHandler("loadProgress", evt.loaded / evt.total * 100);
   });
   xhr.addEventListener("loadend", function(evt) {
     var data = this.response;
@@ -13288,7 +13278,6 @@ function tileLoadProgress(tile, src) {
   xhr.send();
 }
 function updateImageMap(url) {
-  currentUrl = url;
   let curCenter = map.getView().getCenter();
   let curZoom = map.getView().getZoom();
   let source = new Zoomify$1({

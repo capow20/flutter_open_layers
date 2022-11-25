@@ -40,6 +40,7 @@ function setupScene(url) {
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1,
+      zoom: 1,
     }),
   });
   map.getView().fit(extent);
