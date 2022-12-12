@@ -132,7 +132,17 @@ class _OpenLayersViewState extends State<OpenLayersView> {
         padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 15),
         child: GestureDetector(
           onTap: () {
-            controller?.updateLayer(value);
+            if (value.contains('tiled_three')) {
+              controller?.updateLayer(
+                value,
+                replace: false,
+                lat: 0.018467959670429742,
+                long: -0.017113785161427586,
+                zoom: 1.7564143626023134,
+              );
+            } else {
+              controller?.updateLayer(value);
+            }
             setState(() => selectedUrl = value);
           },
           child: Column(
