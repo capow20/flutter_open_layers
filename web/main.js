@@ -4,19 +4,21 @@ import './style.css';
 import TileLayer from 'ol/layer/Tile';
 import Zoomify from 'ol/source/Zoomify';
 import TileState from 'ol/TileState';
-import { transform, useGeographic } from 'ol/proj';
+import VectorLayer from 'ol/layer/Vector';
+import Control from 'ol/control/Control';
+import { fromLonLat, transform, useGeographic } from 'ol/proj';
 
 
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
-let currentUrl = "";
 let extent = [0, -imgHeight, imgWidth,0];
+let currentUrl;
 
 function setupScene(url) {
   currentUrl = url;
   let source = new Zoomify({
-    url: 'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
+    url: 'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url + '{TileGroup}/{z}-{x}-{y}.png',
     size: [imgWidth, imgHeight],
     crossOrigin: 'anonymous',
     zDirection: -1,
@@ -39,13 +41,11 @@ function setupScene(url) {
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
       minZoom: 1,
-      zoom: 2,
     }),
   });
   map.getView().fit(extent, {
     padding: [0,25,0,25],
   });
-
   map.on('click', function(evt){
     console.log(transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326'));
     console.log(map.getView().getZoom());
@@ -79,9 +79,10 @@ function tileLoadProgress(tile, src) {
   xhr.send();
 }
 
-function updateImageMap(url, replace = true, lat, long, zoom) {
+function updateImageMap(url, replace, lat, long, zoom) {
+  replace = replace == null ? true : replace;
   let source = new Zoomify({
-      url:  'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url,
+      url:  'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + url + '{TileGroup}/{z}-{x}-{y}.png',
       size: [imgWidth, imgHeight],
       crossOrigin: 'anonymous',
       zDirection: -1,
@@ -102,18 +103,16 @@ function updateImageMap(url, replace = true, lat, long, zoom) {
   });
 
   resetControls(layer, view, replace);
-  console.log(`Lat: ${lat}, Long: ${long}, Zoom: ${zoom}`);
   if(lat != null && long != null && zoom != null) animateTo(lat,long,zoom);
-
   currentUrl = url;
 }
 
 function resetControls(layer, view, replace) {
   let curCenter = map.getView().getCenter();
   let curZoom = map.getView().getZoom();
-
+  
   let currentSource = new Zoomify({
-    url:  currentUrl,
+    url:  'https://cors-anywhere-ey3dyle52q-uc.a.run.app/' + currentUrl + '{TileGroup}/{z}-{x}-{y}.png',
     size: [imgWidth, imgHeight],
     crossOrigin: 'anonymous',
     zDirection: -1,
@@ -140,13 +139,11 @@ function resetControls(layer, view, replace) {
     layers: layers,
   });
   map.setView(view);
-  map.getView().fit(extent);
-  map.getView().setZoom(curZoom);
-  map.getView().setCenter(curCenter); 
   map.getView().fit(extent, {
     padding: [0,25,0,25],
   });
-  //this is for debugging to find the correct coordinates for focus points
+  map.getView().setZoom(curZoom);
+  map.getView().setCenter(curCenter); 
   map.on('click', function(evt){
     console.log(transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326'));
     console.log(map.getView().getZoom());
@@ -154,12 +151,9 @@ function resetControls(layer, view, replace) {
 }
 
 function animateTo(lat, long, zoom) {
-  //remove this line if debugging to find focus point coordinates
-  //it will give crazy numbers after animating for the first time without reloading page
   useGeographic();
   map.getView().animate({center: [lat, long]}, {zoom: zoom});
 }
 
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;
-window.animateTo = animateTo;

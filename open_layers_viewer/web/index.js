@@ -10972,12 +10972,12 @@ const Zoomify$1 = Zoomify;
 let map;
 const imgWidth = 5192;
 const imgHeight = 6489;
-let currentUrl = "";
 let extent = [0, -imgHeight, imgWidth, 0];
+let currentUrl;
 function setupScene(url) {
   currentUrl = url;
   let source = new Zoomify$1({
-    url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + url,
+    url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + url + "{TileGroup}/{z}-{x}-{y}.png",
     size: [imgWidth, imgHeight],
     crossOrigin: "anonymous",
     zDirection: -1
@@ -10996,8 +10996,7 @@ function setupScene(url) {
       enableRotation: false,
       resolutions: source.getTileGrid().getResolutions(),
       constrainOnlyCenter: true,
-      minZoom: 1,
-      zoom: 2
+      minZoom: 1
     })
   });
   map.getView().fit(extent, {
@@ -11034,9 +11033,10 @@ function tileLoadProgress(tile, src) {
   xhr.open("GET", src);
   xhr.send();
 }
-function updateImageMap(url, replace = true, lat, long, zoom) {
+function updateImageMap(url, replace, lat, long, zoom) {
+  replace = replace == null ? true : replace;
   let source = new Zoomify$1({
-    url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + url,
+    url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + url + "{TileGroup}/{z}-{x}-{y}.png",
     size: [imgWidth, imgHeight],
     crossOrigin: "anonymous",
     zDirection: -1
@@ -11054,7 +11054,6 @@ function updateImageMap(url, replace = true, lat, long, zoom) {
     minZoom: 1
   });
   resetControls(layer, view, replace);
-  console.log(`Lat: ${lat}, Long: ${long}, Zoom: ${zoom}`);
   if (lat != null && long != null && zoom != null)
     animateTo(lat, long, zoom);
   currentUrl = url;
@@ -11063,7 +11062,7 @@ function resetControls(layer, view, replace) {
   let curCenter = map.getView().getCenter();
   let curZoom = map.getView().getZoom();
   let currentSource = new Zoomify$1({
-    url: currentUrl,
+    url: "https://cors-anywhere-ey3dyle52q-uc.a.run.app/" + currentUrl + "{TileGroup}/{z}-{x}-{y}.png",
     size: [imgWidth, imgHeight],
     crossOrigin: "anonymous",
     zDirection: -1
@@ -11088,12 +11087,11 @@ function resetControls(layer, view, replace) {
     layers
   });
   map.setView(view);
-  map.getView().fit(extent);
-  map.getView().setZoom(curZoom);
-  map.getView().setCenter(curCenter);
   map.getView().fit(extent, {
     padding: [0, 25, 0, 25]
   });
+  map.getView().setZoom(curZoom);
+  map.getView().setCenter(curCenter);
   map.on("click", function(evt) {
     console.log(transform(evt.coordinate, "EPSG:3857", "EPSG:4326"));
     console.log(map.getView().getZoom());
@@ -11105,5 +11103,4 @@ function animateTo(lat, long, zoom) {
 }
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;
-window.animateTo = animateTo;
 //# sourceMappingURL=index.js.map

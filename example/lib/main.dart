@@ -136,9 +136,9 @@ class _OpenLayersViewState extends State<OpenLayersView> {
               controller?.updateLayer(
                 value,
                 replace: false,
-                lat: 0.018467959670429742,
-                long: -0.017113785161427586,
-                zoom: 1.7564143626023134,
+                lat: 0.014637973292866905,
+                long: -0.009817264694703454,
+                zoom: 2.555346937263339,
               );
             } else {
               controller?.updateLayer(value);
