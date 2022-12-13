@@ -15,7 +15,7 @@ class OpenLayersImageViewer extends StatefulWidget {
 
 class _OpenLayersImageViewerState extends State<OpenLayersImageViewer> {
   OpenLayersController controller = OpenLayersController(webController: null);
-  final InAppLocalhostServer localhostServer = InAppLocalhostServer(documentRoot: 'packages/open_layers_viewer/web', port: 9090);
+  final InAppLocalhostServer localhostServer = InAppLocalhostServer(documentRoot: 'packages/open_layers_viewer/web', port: 9091);
   double? loadProgress;
   String loadMessage = "Initializing Server...";
 
@@ -38,7 +38,7 @@ class _OpenLayersImageViewerState extends State<OpenLayersImageViewer> {
           initialOptions:
               InAppWebViewGroupOptions(crossPlatform: InAppWebViewOptions(cacheEnabled: false, clearCache: true, transparentBackground: true)),
           onConsoleMessage: (controller, consoleMessage) => print(consoleMessage),
-          initialUrlRequest: URLRequest(url: Uri.parse('http://localhost:9090/index.html')),
+          initialUrlRequest: URLRequest(url: Uri.parse('http://localhost:9091/index.html')),
           onWebViewCreated: (c) {
             controller = OpenLayersController(webController: c);
             if (widget.onWebViewCreated != null) widget.onWebViewCreated!(controller);

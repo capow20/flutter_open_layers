@@ -27,7 +27,7 @@ class OpenLayersController {
   }
 
   Future<void> resetControls() async {
-    return webController?.evaluateJavascript(source: 'window.updateImageMap("$currentUrl")');
+    return webController?.evaluateJavascript(source: 'window.replaceMap()');
   }
 
   Future<void> animateTo(double lat, double long, double zoom) async {

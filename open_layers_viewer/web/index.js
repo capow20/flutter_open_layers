@@ -11101,6 +11101,47 @@ function animateTo(lat, long, zoom) {
   useGeographic();
   map.getView().animate({ center: [lat, long] }, { zoom });
 }
+function replaceMap() {
+  let curCenter = map.getView().getCenter();
+  let curZoom = map.getView().getZoom();
+  let layers = [];
+  map.getLayers().getArray().forEach((element) => {
+    let l = new TileLayer$1({
+      tileSize: 255,
+      source: element.getSource()
+    });
+    layers.push(l);
+  });
+  console.log("NUM LAYERS: " + layers.length);
+  let view = new View$1({
+    extent,
+    enableRotation: false,
+    resolutions: layers[0].getSource().getTileGrid().getResolutions(),
+    constrainOnlyCenter: true,
+    minZoom: 1
+  });
+  const mapElement = document.getElementById("map");
+  mapElement.remove();
+  let newMapElement = document.createElement("div");
+  newMapElement.setAttribute("id", "map");
+  document.body.append(newMapElement);
+  map = new Map$1({
+    controls: [],
+    target: "map",
+    layers
+  });
+  map.setView(view);
+  map.getView().fit(extent, {
+    padding: [0, 25, 0, 25]
+  });
+  map.getView().setZoom(curZoom);
+  map.getView().setCenter(curCenter);
+  map.on("click", function(evt) {
+    console.log(transform(evt.coordinate, "EPSG:3857", "EPSG:4326"));
+    console.log(map.getView().getZoom());
+  });
+}
 window.setupScene = setupScene;
 window.updateImageMap = updateImageMap;
+window.replaceMap = replaceMap;
 //# sourceMappingURL=index.js.map
